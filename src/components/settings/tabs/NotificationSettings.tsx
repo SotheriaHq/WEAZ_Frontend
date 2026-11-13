@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
@@ -256,10 +257,10 @@ const NotificationSettings: React.FC = () => {
         <p className="text-gray-600 dark:text-gray-400">Choose which account, order, and activity updates should reach you in real time.</p>
       </div>
 
-      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 divide-y divide-gray-200 dark:divide-white/10">
+      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 divide-y divide-gray-200 dark:divide-white/10" data-settings-section>
         {sections.map((section) => (
           <div key={section.title} className="p-6">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{section.title}</h3>
+            <SettingsSectionHeading as="h3" className="text-lg font-medium text-gray-900 dark:text-white mb-4">{section.title}</SettingsSectionHeading>
             <div className="space-y-4">
               {section.items.map((item) => {
                 const isChecked = (settings[section.category] as any)?.[item.id] ?? true;

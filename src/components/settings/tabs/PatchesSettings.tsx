@@ -98,7 +98,7 @@ const PatchesSettings: React.FC = () => {
         <p className="text-gray-600 dark:text-gray-400">Manage your connections with other brands.</p>
       </div>
 
-      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden">
+      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 overflow-hidden" data-settings-section>
         <div className="flex border-b border-gray-200 dark:border-white/10">
           <button
             onClick={() => setActiveTab('pending')}

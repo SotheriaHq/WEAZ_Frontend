@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/query/queryKeys';
 import React, { useCallback, useMemo, useState, useLayoutEffect, useRef } from 'react';
@@ -291,11 +292,11 @@ const StoreGeneralSettingsContent: React.FC = () => {
       </div>
 
       {/* Basic Information */}
-      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6 lg:p-8">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6 lg:p-8" data-settings-section>
+        <SettingsSectionHeading className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
           <Store className="w-5 h-5 text-purple-500" />
           Basic Information
-        </h2>
+        </SettingsSectionHeading>
 
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -448,11 +449,11 @@ const StoreGeneralSettingsContent: React.FC = () => {
       </section>
 
       {/* Branding */}
-      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6 lg:p-8">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6 lg:p-8" data-settings-section>
+        <SettingsSectionHeading className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
           <Palette className="w-5 h-5 text-purple-500" />
           Branding
-        </h2>
+        </SettingsSectionHeading>
 
         <div className="space-y-8">
           {/* Store images are profile-derived (read-only here) */}
@@ -519,12 +520,12 @@ const StoreGeneralSettingsContent: React.FC = () => {
       {/* Store Status & Response Time Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Store Status */}
-        <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6">
+        <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6" data-settings-section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <SettingsSectionHeading className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <Power className="w-5 h-5 text-purple-500" />
               Store Status
-            </h2>
+            </SettingsSectionHeading>
             <span
               className={`px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 ${
                 isLive
@@ -542,7 +543,7 @@ const StoreGeneralSettingsContent: React.FC = () => {
               : 'Your store is paused and not accepting new orders.'}
           </p>
 
-          <div className="flex items-center justify-between bg-gray-50 dark:bg-white/5 rounded-lg p-4 border border-gray-200 dark:border-white/5">
+          <div className="flex items-center justify-between bg-gray-50 dark:bg-white/5 rounded-lg p-4 border border-gray-200 dark:border-white/5" data-settings-section>
             <div>
               <h3 className="text-sm font-medium text-gray-900 dark:text-white">Need a break?</h3>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Temporarily pause new orders.</p>
@@ -564,12 +565,12 @@ const StoreGeneralSettingsContent: React.FC = () => {
         </section>
 
         {/* Response Time */}
-        <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6">
+        <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6" data-settings-section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <SettingsSectionHeading className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <Clock className="w-5 h-5 text-purple-500" />
               Response Time
-            </h2>
+            </SettingsSectionHeading>
           </div>
 
           <div className="space-y-4">

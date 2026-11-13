@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -14,7 +15,7 @@ const BrandProfileSettings: React.FC = () => {
         <p className="text-gray-600 dark:text-gray-400">Manage your brand's public appearance.</p>
       </div>
 
-      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-6">
+      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-6" data-settings-section>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Brand Name</label>
@@ -70,8 +71,8 @@ const BrandProfileSettings: React.FC = () => {
           </div>
         </div>
 
-        <div className="pt-4 border-t border-gray-200 dark:border-white/10">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Social Links</h3>
+        <div className="pt-4 border-t border-gray-200 dark:border-white/10" data-settings-section>
+          <SettingsSectionHeading as="h3" className="text-lg font-medium text-gray-900 dark:text-white mb-4">Social Links</SettingsSectionHeading>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Instagram</label>

@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
@@ -147,8 +148,8 @@ const ProfileVisibilitySettings: React.FC = () => {
         <p className="text-gray-600 dark:text-gray-400">Choose what shows up on your public profile.</p>
       </div>
 
-      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">What others see</h2>
+      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-4" data-settings-section>
+        <SettingsSectionHeading className="text-sm font-semibold uppercase tracking-wide text-gray-500">What others see</SettingsSectionHeading>
         <PrivacyToggleRow
           emoji="🪪"
           title="Show my username"
@@ -168,8 +169,8 @@ const ProfileVisibilitySettings: React.FC = () => {
       </div>
 
       {user.type === 'REGULAR' && visibility !== null && (
-        <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Patches list</h2>
+        <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-4" data-settings-section>
+          <SettingsSectionHeading className="text-sm font-semibold uppercase tracking-wide text-gray-500">Patches list</SettingsSectionHeading>
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Public profile</h3>

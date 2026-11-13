@@ -3561,3 +3561,17 @@ html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidd
     opacity: 0.6;
   }
 }
+
+/* Only Settings section containers lose decoration. Inputs and selectable controls retain it. */
+.wiez-settings-screen [data-settings-section] {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+.wiez-settings-screen [data-settings-section]:not([data-settings-highlighted="true"]) {
+  box-shadow: none !important;
+}
+.wiez-settings-screen [data-settings-section].divide-y > :not([hidden]) ~ :not([hidden]) {
+  border-top-width: 0;
+  border-bottom-width: 0;
+}
