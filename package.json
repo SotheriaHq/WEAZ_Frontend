@@ -29,7 +29,7 @@
     "check:perf-regressions": "node scripts/test-vendor-chunks.mjs && node scripts/check-perf-regressions.cjs",
     "check:security-headers": "node scripts/check-security-headers.cjs",
     "purge:cloudflare": "node scripts/purge-cloudflare-cache.cjs",
-    "ci:phase8": "npm run test:legal-sync-ci-contract && npm run build && npm run lint && npm run test:release-boot && npm run test:subscription-quotes && npm run test:mfa-security && npm run test:session-response-isolation && npm run test:session-socket && npm run check:perf-regressions && npm run test:session-devices && npm run test:studio-access && npm run test:studio-cache && npm run test:settings-sections",
+    "ci:phase8": "npm run test:legal-sync-ci-contract && npm run build && npm run lint && npm run test:release-boot && npm run test:subscription-quotes && npm run test:mfa-security && npm run test:session-response-isolation && npm run test:session-socket && npm run check:perf-regressions && npm run test:session-devices && npm run test:studio-access && npm run test:studio-cache && npm run test:settings-sections && npm run test:notification-settings",
     "test:release-boot": "npm test -- --run src/__tests__/RequireStoreSetup.test.tsx src/__tests__/useBrandProfile.renderIsolation.test.tsx src/__tests__/renderableMedia.test.ts src/__tests__/customerSettingsDraft.test.tsx src/__tests__/customerEntitlementExpiry.test.ts src/__tests__/customerEntitlementExpiry.hook.test.tsx src/__tests__/webFonts.test.ts src/__tests__/designViewerLazy.test.tsx src/__tests__/museLoader.test.tsx src/__tests__/sentryConfiguration.test.ts src/__tests__/routePreloads.test.ts src/components/ui/NoticeModal.test.tsx src/__tests__/noticeLazy.test.tsx src/__tests__/bagFlowLazy.test.tsx src/__tests__/runwayCommentsLazy.test.tsx src/components/custom-orders/CustomOrderQueue.test.tsx src/features/orders/customOrderQueuePresentation.test.ts src/__tests__/RunwayStageChrome.test.tsx src/lib/refundPresentation.test.ts src/__tests__/OrderDetail.test.tsx src/utils/imagePreprocess.test.ts src/utils/uploadValidation.test.ts src/__tests__/uploadApiNormalize.test.ts src/hooks/useDesignUpload.test.ts src/hooks/useMediaStore.test.tsx src/components/media/LocalMediaPreview.test.tsx src/utils/catalogTaskStatus.test.ts src/__tests__/appRouterStartup.test.tsx src/__tests__/themeBackendSync.test.tsx src/__tests__/studioNavigationFeedback.test.tsx src/components/designs/DesignSkeleton.test.tsx",
     "test:design-tokens-contract": "node ../threadly-mobile/scripts/test-design-tokens-contract.js",
     "test:subscription-quotes": "vitest run src/api/CustomOrderQueueApi.test.ts src/api/subscriptionQuote.test.ts",
@@ -39,7 +39,8 @@
     "test:session-devices": "node --test scripts/test-security-device-modals.cjs",
     "test:studio-access": "vitest run src/__tests__/RequireStoreSetup.test.tsx src/__tests__/useStoreSetupStatus.test.tsx src/__tests__/setupRemediation.test.tsx",
     "test:studio-cache": "vitest run src/__tests__/StudioGeneralCache.test.tsx src/__tests__/StudioPolicyCache.test.tsx src/__tests__/StudioVerificationCache.test.tsx src/api/StoreSettingsCache.test.ts src/query/queryPersistor.test.ts src/auth/sessionCleanup.test.ts",
-    "test:settings-sections": "node scripts/test-settings-sections.cjs && vitest run src/components/settings/SettingsSectionHeading.test.tsx"
+    "test:settings-sections": "node scripts/test-settings-sections.cjs && vitest run src/components/settings/SettingsSectionHeading.test.tsx",
+    "test:notification-settings": "vitest run src/notifications/notificationSettingsStore.test.ts src/components/settings/tabs/NotificationSettings.test.tsx"
   },
   "dependencies": {
     "@emoji-mart/data": "^1.2.1",

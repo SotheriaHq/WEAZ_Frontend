@@ -69,3 +69,6 @@ jobs:
 
       - name: Settings section headings and bare-container contract
         run: npm run test:settings-sections
+
+      - name: Notification section navigation and session-bound saves
+        run: npm run test:notification-settings
