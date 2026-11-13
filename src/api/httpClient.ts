@@ -23,6 +23,9 @@ let volatileAccessToken: string | null = null;
 const securityIdentity = (token: string | null) => securityIdentityFromToken(token, value => atob(value));
 const currentSecurityIdentity = () => securityIdentity(volatileAccessToken);
 export const getApiSecurityIdentity = currentSecurityIdentity;
+/** Captured when a queued action starts; normal JWT refresh keeps this scope. */
+export type SessionRequestConfig = import('axios').AxiosRequestConfig & { _securityIdentity?: string; _authScope: number };
+export const getApiSessionScope = () => authScope;
 const tokenListeners = new Set<() => void>();
 export const subscribeAccessToken = (listener: () => void) => {
   tokenListeners.add(listener);

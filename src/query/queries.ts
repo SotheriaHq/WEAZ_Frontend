@@ -13,7 +13,7 @@ import {
   type CustomOrderSourceType,
 } from '@/api/CustomOrderApi';
 import { apiClient } from '@/api/httpClient';
-import { NotificationsApi } from '@/api/NotificationsApi';
+import { getNotificationSettingsStore } from '@/notifications/notificationSettingsStore';
 import { ReactionsApi } from '@/api/ReactionsApi';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { getStoreStatus } from '@/api/StoreApi';
@@ -391,10 +391,12 @@ export function useStoreStatusQuery(options?: EnabledOption) {
 }
 
 export function useNotificationSettingsQuery(userId?: string | null, options?: EnabledOption) {
+  const client = useQueryClient();
+  const settings = getNotificationSettingsStore(client, userId ?? null);
   return useQuery({
     queryKey: queryKeys.notifications.settings(userId),
-    queryFn: () => NotificationsApi.getSettings(),
-    enabled: isEnabled(userId, options?.enabled ?? true),
+    queryFn: ({ signal }) => settings.load(signal),
+    enabled: settings.isCurrent() && isEnabled(userId, options?.enabled ?? true),
     staleTime: WIEZ_NOTIFICATION_SETTINGS_STALE_TIME_MS,
   });
 }
