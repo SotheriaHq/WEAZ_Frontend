@@ -66,3 +66,6 @@ jobs:
 
       - name: Studio cache reuse, draft safety and private-data persistence
         run: npm run test:studio-cache
+
+      - name: Settings section headings and bare-container contract
+        run: npm run test:settings-sections

@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import { SecurityDevicesPanel } from '@/components/settings/SecurityDevicesPanel';
 import { MfaSettingsPanel } from '@/components/settings/MfaSettingsPanel';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -639,8 +640,8 @@ const AccountSecuritySettings: React.FC = () => {
       </div>
 
       <div className="space-y-6 rounded-xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-gray-950" data-settings-section>
-        <section className="space-y-4">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Email Address</h2>
+        <section className="space-y-4" data-settings-section>
+          <SettingsSectionHeading className="text-lg font-medium text-gray-900 dark:text-white">Email Address</SettingsSectionHeading>
 
           {isAdmin ? (
             <AdminEmailSection currentEmail={profile.email} />
@@ -718,8 +719,8 @@ const AccountSecuritySettings: React.FC = () => {
           )}
         </section>
 
-        <section className="space-y-4 pt-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Password</h2>
+        <section className="space-y-4 pt-6" data-settings-section>
+          <SettingsSectionHeading className="text-lg font-medium text-gray-900 dark:text-white">Password</SettingsSectionHeading>
           <form onSubmit={submitPasswordChange} className="space-y-4">
             <label className="space-y-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Current Password</span>
@@ -814,14 +815,14 @@ const AccountSecuritySettings: React.FC = () => {
 
         <MfaSettingsPanel key={profile.id} actorId={profile.id} />
 
-        <section className="space-y-4 pt-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Login sessions</h2>
+        <section className="space-y-4 pt-6" data-settings-section>
+          <SettingsSectionHeading className="text-lg font-medium text-gray-900 dark:text-white">Login sessions</SettingsSectionHeading>
           <SecurityDevicesPanel key={profile?.id} actorId={profile?.id ?? ''} />
         </section>
 
-        <section className="space-y-4 pt-6">
+        <section className="space-y-4 pt-6" data-settings-section>
           <div>
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Security Alerts</h2>
+            <SettingsSectionHeading className="text-lg font-medium text-gray-900 dark:text-white">Security Alerts</SettingsSectionHeading>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               These preferences save immediately when you toggle them.
             </p>
@@ -847,9 +848,9 @@ const AccountSecuritySettings: React.FC = () => {
         </section>
 
         {!isAdmin && (
-          <section className="space-y-4 pt-6">
+          <section className="space-y-4 pt-6" data-settings-section>
             <div>
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white">Preferred Size Chart</h2>
+              <SettingsSectionHeading className="text-lg font-medium text-gray-900 dark:text-white">Preferred Size Chart</SettingsSectionHeading>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 This sets your preferred size chart labels used across custom-order composer and size-chart conversion views.
               </p>
@@ -871,7 +872,7 @@ const AccountSecuritySettings: React.FC = () => {
 
         <section className="space-y-4 border-t border-red-200 pt-6 dark:border-red-900/20" data-settings-section>
           <div>
-            <h2 className="text-lg font-medium text-red-600 dark:text-red-400">Danger Zone</h2>
+            <SettingsSectionHeading className="text-lg font-medium text-red-600 dark:text-red-400">Danger Zone</SettingsSectionHeading>
             <p className="text-sm text-red-500 dark:text-red-300">
               This action is irreversible from the account surface.
             </p>

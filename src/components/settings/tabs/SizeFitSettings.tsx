@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -90,8 +91,8 @@ const SizeFitSettings: React.FC = () => {
         </p>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-gray-950">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">How we size clothes for you</h2>
+      <div className="rounded-xl border border-gray-200 bg-white p-6 dark:border-white/10 dark:bg-gray-950" data-settings-section>
+        <SettingsSectionHeading className="text-lg font-semibold text-gray-900 dark:text-white">How we size clothes for you</SettingsSectionHeading>
         <p className="mt-1 text-sm text-gray-500">
           Are you a man, a woman, non-binary, or would you rather not say? This picks the right size chart. You can change it any time.
         </p>

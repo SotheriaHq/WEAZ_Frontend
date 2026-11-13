@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React from 'react';
 import { useCategorySuggestions } from '@/hooks/useCategorySuggestions';
 import Button from '@/components/ui/Button';
@@ -7,7 +8,7 @@ const CategorySuggestionsSettings: React.FC = () => {
   const query = useCategorySuggestions();
   const requests = query.data?.pages.flatMap((page) => page.items) ?? [];
   return (
-    <section className="space-y-6 text-gray-900 dark:text-white">
+    <section className="space-y-6 text-gray-900 dark:text-white" data-settings-section>
       <div>
         <h1 className="text-2xl font-semibold">Category requests</h1>
         <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
@@ -17,7 +18,7 @@ const CategorySuggestionsSettings: React.FC = () => {
       </div>
       <CategorySuggestionForm onSubmitted={() => void query.refetch()} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Your requests</h2>
+        <SettingsSectionHeading className="text-lg font-semibold">Your requests</SettingsSectionHeading>
         <Button type="button" variant="secondary" disabled={query.isFetching} onClick={() => void query.refetch()}>Refresh requests</Button>
       </div>
       {query.isPending ? <p role="status">Loading category requests…</p> : null}

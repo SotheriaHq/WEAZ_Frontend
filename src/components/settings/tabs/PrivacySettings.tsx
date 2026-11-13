@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import { Link } from 'react-router-dom';
 import Button from '@/components/ui/Button';
 import { browserOptsOutOfTracking, openConsentSettings, useConsent } from '@/privacy/consent';
@@ -35,11 +36,11 @@ export default function PrivacySettings() {
         </p>
       </div>
 
-      <section aria-labelledby="privacy-cookies-title" className="space-y-4">
+      <section aria-labelledby="privacy-cookies-title" className="space-y-4" data-settings-section>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="privacy-cookies-title" className="text-lg font-semibold text-[var(--text-primary)]">
+          <SettingsSectionHeading id="privacy-cookies-title" className="text-lg font-semibold text-[var(--text-primary)]">
             Cookie preferences
-          </h2>
+          </SettingsSectionHeading>
           <Button variant="secondary" size="sm" onClick={openConsentSettings}>
             Change cookie settings
           </Button>
@@ -69,10 +70,10 @@ export default function PrivacySettings() {
         </p>
       </section>
 
-      <section aria-labelledby="privacy-profile-title" className="space-y-2">
-        <h2 id="privacy-profile-title" className="text-lg font-semibold text-[var(--text-primary)]">
+      <section aria-labelledby="privacy-profile-title" className="space-y-2" data-settings-section>
+        <SettingsSectionHeading id="privacy-profile-title" className="text-lg font-semibold text-[var(--text-primary)]">
           Profile visibility
-        </h2>
+        </SettingsSectionHeading>
         <p className="text-sm text-[var(--text-secondary)]">
           Decide what other people can see on your profile.
         </p>

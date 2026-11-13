@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import Button from '@/components/ui/Button';
@@ -60,7 +61,7 @@ const StoreHoursSettings: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white">Working hours</h2>
+        <SettingsSectionHeading className="text-xl font-bold text-slate-900 dark:text-white">Working hours</SettingsSectionHeading>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Set the days and hours your store operates. Order fulfilment timers only
           count during these hours, so you are measured fairly.
