@@ -561,6 +561,18 @@ html {
     --wiez-lg-stage-shadow: 0 8px 26px -6px rgba(0, 0, 0, 0.42), 0 2px 6px rgba(0, 0, 0, 0.22);
     --wiez-lg-stage-fallback-bg: rgba(18, 18, 24, 0.84);
     --wiez-lg-stage-reduced-bg: rgba(14, 14, 20, 0.93);
+
+    /* WIEZ Strong Lens (refracting controls). Alphas mirror LIQUID_GLASS_LENS.lensTintAlpha. */
+    --wiez-lg-lens-tint: rgba(255, 255, 255, 0.14);
+    --wiez-lg-lens-hover-tint: rgba(255, 255, 255, 0.22);
+    --wiez-lg-lens-stage-tint: rgba(16, 16, 22, 0.14);
+    --wiez-lg-lens-stage-hover-tint: rgba(16, 16, 22, 0.24);
+    --wiez-lg-lens-shadow: 0 10px 28px -12px rgba(15, 23, 42, 0.30), 0 2px 6px -2px rgba(15, 23, 42, 0.10);
+    --wiez-lg-lens-stage-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.65), 0 2px 6px -2px rgba(0, 0, 0, 0.35);
+    --wiez-lg-lens-halo: 0 0 2px rgba(255, 255, 255, 0.7), 0 0 8px rgba(255, 255, 255, 0.75);
+    --wiez-lg-lens-icon-halo: drop-shadow(0 0 2px rgba(255, 255, 255, 0.75)) drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+    --wiez-lg-lens-stage-halo: 0 0 2px rgba(0, 0, 0, 0.7), 0 1px 7px rgba(0, 0, 0, 0.6);
+    --wiez-lg-lens-stage-icon-halo: drop-shadow(0 0 2px rgba(0, 0, 0, 0.6)) drop-shadow(0 1px 4px rgba(0, 0, 0, 0.45));
   }
 
   .dark {
@@ -754,6 +766,13 @@ html {
     --wiez-lg-focus-ring: 0 0 0 2px rgba(18, 16, 28, 0.96), 0 0 0 4px rgba(192, 132, 252, 0.85);
     --wiez-lg-fallback-bg: rgba(18, 16, 28, 0.92);
     --wiez-lg-reduced-bg: rgba(14, 12, 22, 0.97);
+
+    /* WIEZ Strong Lens (Dark) */
+    --wiez-lg-lens-tint: rgba(18, 18, 24, 0.14);
+    --wiez-lg-lens-hover-tint: rgba(18, 18, 24, 0.24);
+    --wiez-lg-lens-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.65), 0 2px 6px -2px rgba(0, 0, 0, 0.35);
+    --wiez-lg-lens-halo: 0 0 2px rgba(0, 0, 0, 0.7), 0 1px 7px rgba(0, 0, 0, 0.6);
+    --wiez-lg-lens-icon-halo: drop-shadow(0 0 2px rgba(0, 0, 0, 0.6)) drop-shadow(0 1px 4px rgba(0, 0, 0, 0.45));
   }
 
 }
@@ -1371,6 +1390,79 @@ html {
 
   .wiez-lg-borderless {
     border-width: 0 !important;
+  }
+
+  /*
+   * Strong Lens. `LiquidGlassLensLayer` sets `data-lg-lens="on"`, an inline
+   * `backdrop-filter: url(#wiez-lens-…)` (SVG displacement of the live page)
+   * and `--wiez-lg-material` (geometry-derived Fresnel, specular and edge shade)
+   * on control-sized surfaces in Chromium. Everything else keeps the frosted
+   * material above. Geometry replaces the decorative border, sheen and inset
+   * highlight lines; the tint drops to the lens tint.
+   */
+  .wiez-lg-surface[data-lg-lens='on'] {
+    --wiez-lg-local-bg: var(--wiez-lg-lens-tint);
+    --wiez-lg-local-hover-bg: var(--wiez-lg-lens-hover-tint);
+    background-color: var(--wiez-lg-local-bg);
+    background-image: var(--wiez-lg-material, none);
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-origin: border-box;
+    background-clip: border-box;
+    border-color: transparent;
+    box-shadow: var(--wiez-lg-lens-shadow);
+    text-shadow: var(--wiez-lg-lens-halo);
+  }
+
+  /* The UA stylesheet sets `text-shadow: none` on form controls; let nested tabs inherit the halo. */
+  .wiez-lg-surface[data-lg-lens='on'] :where(button, a, input, select) {
+    text-shadow: inherit;
+  }
+
+  .wiez-lg-surface[data-lg-lens='on'] svg {
+    filter: var(--wiez-lg-lens-icon-halo);
+  }
+
+  .wiez-lg-surface.wiez-lg-stage[data-lg-lens='on'] {
+    --wiez-lg-local-bg: var(--wiez-lg-lens-stage-tint);
+    --wiez-lg-local-hover-bg: var(--wiez-lg-lens-stage-hover-tint);
+    box-shadow: var(--wiez-lg-lens-stage-shadow);
+    text-shadow: var(--wiez-lg-lens-stage-halo);
+  }
+
+  .wiez-lg-surface.wiez-lg-stage[data-lg-lens='on'] svg {
+    filter: var(--wiez-lg-lens-stage-icon-halo);
+  }
+
+  @media (hover: hover) {
+    .wiez-lg-surface.wiez-lg-interactive[data-lg-lens='on']:hover:not(:disabled):not([aria-disabled='true']) {
+      background-color: var(--wiez-lg-local-hover-bg);
+      border-color: transparent;
+      box-shadow: var(--wiez-lg-lens-shadow);
+    }
+
+    .wiez-lg-surface.wiez-lg-interactive.wiez-lg-stage[data-lg-lens='on']:hover:not(:disabled):not([aria-disabled='true']) {
+      background-color: var(--wiez-lg-lens-stage-hover-tint);
+      box-shadow: var(--wiez-lg-lens-stage-shadow);
+    }
+  }
+
+  .wiez-lg-surface.wiez-lg-interactive[data-lg-lens='on']:focus-visible {
+    box-shadow: var(--wiez-lg-lens-shadow), var(--wiez-lg-focus-ring);
+  }
+
+  .wiez-lg-surface.wiez-lg-active[data-lg-lens='on'] {
+    background-color: transparent;
+    background-image: var(--wiez-lg-material, none), var(--wiez-lg-active-bg);
+    background-size: 100% 100%, auto;
+    border-color: transparent;
+    box-shadow: var(--wiez-lg-active-shadow);
+  }
+
+  .wiez-lg-surface.wiez-lg-stage.wiez-lg-active[data-lg-lens='on'] {
+    background-color: rgba(168, 85, 247, 0.22);
+    background-image: var(--wiez-lg-material, none), linear-gradient(150deg, rgba(255, 255, 255, 0.16) 0%, rgba(168, 85, 247, 0.1) 100%);
+    box-shadow: 0 4px 16px -2px rgba(168, 85, 247, 0.5);
   }
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {

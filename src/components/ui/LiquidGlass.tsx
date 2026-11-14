@@ -1,5 +1,6 @@
 import React from 'react';
 import { clsx } from 'clsx';
+import { LIQUID_GLASS_LENS } from './liquidGlassOptics';
 
 export type LiquidGlassIntensity = 'subtle' | 'regular' | 'prominent';
 export type LiquidGlassTone = 'auto' | 'light' | 'dark' | 'stage';
@@ -25,12 +26,13 @@ export interface LiquidGlassClassOptions {
 }
 
 /**
- * Web optical calibration parameters aligned with the approved WIEZ v4
- * Liquid Glass reference baseline: clear center transmission, high-saturation
- * backdrop sampling, directional specular rim lighting, zero chromatic
- * aberration, and graceful reduced-transparency fallback support.
+ * Web Liquid Glass material. `lens` is the Strong Lens spec that refracting
+ * controls use (see `liquidGlassOptics.ts` and `LiquidGlassLensLayer`); the
+ * blur/saturation buckets are the frosted material for panels, menus, and
+ * browsers that cannot refract the backdrop.
  */
 export const LIQUID_GLASS_OPTICAL_SPEC = {
+  lens: LIQUID_GLASS_LENS,
   specularAngleDeg: 148,
   chromaticAberration: 0,
   blurPx: {

@@ -14,6 +14,7 @@ import { BrandPatchProvider } from './context/BrandPatchContext';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
 import { NoticeModalHost } from '@/components/ui/NoticeModal';
+import { LiquidGlassLensLayer } from '@/components/ui/LiquidGlassLensLayer';
 import { MuseLoader } from '@/components/loaders/MuseLoader';
 const ErrorPage = lazy(() => import('./pages/ErrorPage'));
 import SeoHead from './components/seo/SeoHead';
@@ -1144,6 +1145,7 @@ const App: React.FC = () => (
             duration={5000}
           />
           <NoticeModalHost />
+          <LiquidGlassLensLayer />
           <RouterProvider router={router} />
         </BrandPatchProvider>
       </DropdownManagerProvider>
