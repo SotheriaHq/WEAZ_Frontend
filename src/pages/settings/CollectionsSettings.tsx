@@ -174,7 +174,7 @@ const CollectionsSettings: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#000000]">
+    <div className="wiez-settings-screen min-h-screen bg-white dark:bg-[#000000]">
       {/* Settings Sidebar */}
       <SettingsSidebar active="collections" onSelect={() => {}} />
 

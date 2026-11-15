@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React from 'react';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
@@ -201,7 +202,7 @@ const SecuritySettings: React.FC = () => {
       <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-6" data-settings-section>
         <div className="flex items-center gap-2 mb-2">
           <span aria-hidden="true">🔐</span>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Password</h2>
+          <SettingsSectionHeading className="text-lg font-medium text-gray-900 dark:text-white">Password</SettingsSectionHeading>
         </div>
 
         <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -293,7 +294,7 @@ const SecuritySettings: React.FC = () => {
       <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-4" data-settings-section>
         <div className="flex items-center gap-2">
           <span aria-hidden="true">🧾</span>
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Recognized Devices</h2>
+          <SettingsSectionHeading className="text-lg font-medium text-gray-900 dark:text-white">Recognized Devices</SettingsSectionHeading>
         </div>
 
         {loadingDevices ? (

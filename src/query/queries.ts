@@ -13,7 +13,7 @@ import {
   type CustomOrderSourceType,
 } from '@/api/CustomOrderApi';
 import { apiClient } from '@/api/httpClient';
-import { NotificationsApi } from '@/api/NotificationsApi';
+import { getNotificationSettingsStore } from '@/notifications/notificationSettingsStore';
 import { ReactionsApi } from '@/api/ReactionsApi';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { getStoreStatus } from '@/api/StoreApi';
@@ -376,19 +376,27 @@ export async function fetchDesignDetailQuery(
 
 export function useStoreStatusQuery(options?: EnabledOption) {
   const actor = useSelector((state: RootState) => state.user.profile);
+  const brandId = getActiveBrandId(actor);
   return useQuery({
-    queryKey: queryKeys.store.status(actor?.id, getActiveBrandId(actor)),
-    queryFn: () => getStoreStatus({ forceRefresh: true }),
+    queryKey: queryKeys.store.status(actor?.id, brandId),
+    queryFn: async () => {
+      const status = await getStoreStatus({ forceRefresh: true, expectedBrandId: brandId });
+      if (brandId && status.brandId !== brandId) throw new Error('Store setup status belongs to a different workspace. Please retry.');
+      return status;
+    },
+    select: status => brandId && status.brandId !== brandId ? undefined : status,
     enabled: Boolean(actor?.id) && (options?.enabled ?? true),
     staleTime: 60_000,
   });
 }
 
 export function useNotificationSettingsQuery(userId?: string | null, options?: EnabledOption) {
+  const client = useQueryClient();
+  const settings = getNotificationSettingsStore(client, userId ?? null);
   return useQuery({
     queryKey: queryKeys.notifications.settings(userId),
-    queryFn: () => NotificationsApi.getSettings(),
-    enabled: isEnabled(userId, options?.enabled ?? true),
+    queryFn: ({ signal }) => settings.load(signal),
+    enabled: settings.isCurrent() && isEnabled(userId, options?.enabled ?? true),
     staleTime: WIEZ_NOTIFICATION_SETTINGS_STALE_TIME_MS,
   });
 }

@@ -50,6 +50,8 @@ jobs:
         run: npm run test:mfa-security
       - name: Session response and cookie rotation isolation
         run: npm run test:session-response-isolation
+      - name: Device-session modals and identity-bound actions
+        run: npm run test:session-devices
       - name: Session-bound realtime recovery
         run: npm run test:session-socket
 
@@ -58,3 +60,15 @@ jobs:
 
       - name: Performance regression guard
         run: npm run check:perf-regressions
+
+      - name: Studio access and Settings destination state matrix
+        run: npm run test:studio-access
+
+      - name: Studio cache reuse, draft safety and private-data persistence
+        run: npm run test:studio-cache
+
+      - name: Settings section headings and bare-container contract
+        run: npm run test:settings-sections
+
+      - name: Notification section navigation and session-bound saves
+        run: npm run test:notification-settings

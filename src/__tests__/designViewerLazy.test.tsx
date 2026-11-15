@@ -27,7 +27,7 @@ it('consumes Back during a slow viewer download and never reopens a cancelled ov
   expect(overlayBackChannel.consumesPop()).toBe(true);
   expect(push).toHaveBeenCalledOnce();
 
-  act(() => window.dispatchEvent(new PopStateEvent('popstate')));
+  act(() => { window.history.replaceState({}, '', window.location.href); window.dispatchEvent(new PopStateEvent('popstate', { state: {} })); });
   expect(onClose).toHaveBeenCalledOnce();
   view.rerender(<DesignViewModal open={false} item={null} onClose={onClose} />);
   await act(async () => { loading.resolve(); await loading.promise; });
@@ -37,7 +37,7 @@ it('consumes Back during a slow viewer download and never reopens a cancelled ov
   view.rerender(<DesignViewModal open item={null} onClose={onClose} />);
   expect(await screen.findByText('Ready viewer')).toBeInTheDocument();
   expect(push).toHaveBeenCalledTimes(2);
-  view.unmount();
+  await act(async () => { view.unmount(); });
   expect(back).toHaveBeenCalledOnce();
   expect(overlayBackChannel.consumesPop()).toBe(false);
   vi.restoreAllMocks();

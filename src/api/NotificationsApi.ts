@@ -1,4 +1,5 @@
-import { apiClient } from './httpClient';
+import { apiClient, type SessionRequestConfig } from './httpClient';
+import type { NotificationSettings, NotificationSettingsPatch } from '@/notifications/notificationSettings';
 
 export class NotificationsApi {
   static async getUnreadCount(): Promise<{ count: number }> {
@@ -36,13 +37,13 @@ export class NotificationsApi {
     return (payload?.data ?? payload) as { success: boolean; id: string };
   }
 
-  static async getSettings(): Promise<any> {
-    const response = await apiClient.get('/notifications/settings');
+  static async getSettings(config?: SessionRequestConfig): Promise<NotificationSettings> {
+    const response = await apiClient.get('/notifications/settings', config);
     return response.data?.data ?? response.data;
   }
 
-  static async updateSettings(settings: any): Promise<any> {
-    const response = await apiClient.patch('/notifications/settings', settings);
+  static async updateSettings(settings: NotificationSettingsPatch, config?: SessionRequestConfig): Promise<NotificationSettings> {
+    const response = await apiClient.patch('/notifications/settings', settings, config);
     return response.data?.data ?? response.data;
   }
 

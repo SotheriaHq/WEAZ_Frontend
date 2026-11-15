@@ -56,7 +56,7 @@ function RecoveryContent() {
 }
 export default function MfaRecoveryPage() {
   const actorId = useSelector((state: RootState) => state.user.profile?.id);
-  return <main className="mx-auto max-w-2xl space-y-6 px-5 py-8">
+  return <main className="wiez-settings-screen mx-auto max-w-2xl space-y-6 px-5 py-8">
     <Link className="inline-block py-3 underline" to="/settings">Back to Settings</Link>
     <h1 className="text-2xl font-semibold">Verification recovery</h1>
     {actorId ? <RecoveryContent key={actorId} /> : <Link to="/login">Sign in to review account recovery</Link>}

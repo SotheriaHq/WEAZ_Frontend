@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
@@ -49,10 +50,10 @@ const AccountSettings: React.FC = () => {
         <p className="text-gray-600 dark:text-gray-400">Manage your email, password, devices, size chart, and account actions.</p>
       </div>
 
-      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-8">
+      <div className="bg-white dark:bg-gray-950 rounded-xl border border-gray-200 dark:border-white/10 p-6 space-y-8" data-settings-section>
         {/* Email Section */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Email Address</h3>
+          <SettingsSectionHeading as="h3" className="text-lg font-medium text-gray-900 dark:text-white">Email Address</SettingsSectionHeading>
           <div className="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-white/10">
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-white">Current Email</p>
@@ -66,7 +67,7 @@ const AccountSettings: React.FC = () => {
 
         {/* Password Section */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Password</h3>
+          <SettingsSectionHeading as="h3" className="text-lg font-medium text-gray-900 dark:text-white">Password</SettingsSectionHeading>
           <div className="space-y-4">
             <button
               type="button"
@@ -92,7 +93,7 @@ const AccountSettings: React.FC = () => {
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Custom Order Display Chart</h3>
+          <SettingsSectionHeading as="h3" className="text-lg font-medium text-gray-900 dark:text-white">Custom Order Display Chart</SettingsSectionHeading>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             This sets your preferred size chart labels used across custom-order composer and size-chart conversion views.
           </p>
@@ -111,8 +112,8 @@ const AccountSettings: React.FC = () => {
         </div>
 
         {/* Danger Zone */}
-        <div className="pt-8 border-t border-gray-200 dark:border-white/10">
-          <h3 className="text-lg font-medium text-red-600 mb-4">Danger Zone</h3>
+        <div className="pt-8 border-t border-gray-200 dark:border-white/10" data-settings-section>
+          <SettingsSectionHeading as="h3" className="text-lg font-medium text-red-600 mb-4">Danger Zone</SettingsSectionHeading>
           <div className="p-4 rounded-lg border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-900/10 flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-red-900 dark:text-red-200">Delete Account</p>

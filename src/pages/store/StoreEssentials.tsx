@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { ArrowRight, Sparkles, Store, CheckCircle2, Circle } from 'lucide-react';
 import type { RootState } from '@/store';
-import { getStoreWizardPrefill, updateStoreProfile } from '@/api/StoreApi';
+import { getActiveBrandId } from '@/lib/brandAccess';
+import { queryClient } from '@/query/queryClient';
+import { queryKeys } from '@/query/queryKeys';
+import { getStoreWizardPrefill, getStoreStatus, updateStoreProfile } from '@/api/StoreApi';
 import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
 import { readStoreProgressLocally, saveStoreProgressLocally } from '@/utils/storeSetup';
@@ -98,6 +101,7 @@ type StoreEssentialsProgress = {
 const StoreEssentials: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
+  const activeBrandId = getActiveBrandId(user);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -119,10 +123,15 @@ const StoreEssentials: React.FC = () => {
     const boot = async () => {
       setIsLoading(true);
       try {
-        const prefill = await getStoreWizardPrefill();
+        const [prefill, setupStatus] = await Promise.all([
+          getStoreWizardPrefill(),
+          queryClient.fetchQuery({ queryKey: queryKeys.store.status(user?.id, activeBrandId),
+            queryFn: () => getStoreStatus({ forceRefresh: true, expectedBrandId: activeBrandId }), staleTime: 60_000 }).catch(() => null),
+        ]);
         if (cancelled) return;
 
-        if (prefill.flags?.hasLiveStore) {
+        if (activeBrandId && setupStatus && setupStatus.brandId !== activeBrandId) throw new Error('Store setup status belongs to a different workspace.');
+        if (setupStatus?.isSetupComplete === true) {
           navigate('/studio/store', { replace: true });
           return;
         }
@@ -225,7 +234,7 @@ const StoreEssentials: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [navigate, user?.brandDescription, user?.id]);
+  }, [navigate, user?.brandDescription, user?.id, activeBrandId]);
 
   useEffect(() => {
     /**

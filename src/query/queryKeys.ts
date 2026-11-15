@@ -90,6 +90,10 @@ export const queryKeys = {
       ['designs', 'user', normalizeId(userId), normalizeRecord(params)] as const,
   },
   store: {
+    generalSettings: (actorId?: string | null, brandId?: string | null) =>
+      ['store', 'general-settings', normalizeId(actorId), normalizeId(brandId)] as const,
+    policies: (actorId?: string | null, brandId?: string | null) =>
+      ['store', 'policies', normalizeId(actorId), normalizeId(brandId)] as const,
     status: (actorId?: string | null, brandId?: string | null) =>
       actorId ? ['store', 'status', normalizeId(actorId), normalizeId(brandId)] as const : ['store', 'status'] as const,
     cart: (userId?: string | null) => ['store', 'cart', normalizeId(userId)] as const,

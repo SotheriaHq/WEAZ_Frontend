@@ -1,8 +1,8 @@
 # WIEZ Master Terms of Service
 
-**Effective Date:** October 23, 2026
+**Effective Date:** November 11, 2026
 
-**Document Version:** 2026.10.23-v1.6
+**Document Version:** 2026.11.11-v1.7
 
 **Applies To:** Web (`wiez.com`, `fthreadly`), Mobile Applications (iOS / Android / `threadly-mobile`), Brand Studio Workspaces, and all platform APIs.
 
@@ -444,7 +444,7 @@ If you have any questions, compliance inquiries, or concerns regarding these Ter
 
 ### Subscription custom-order policy scope and consumer rights
 
-The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.23-v1.6`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.23-v1.6` or later; the free plan and the plan-ending notices described here apply from version `2026.11.11-v1.7`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
 
 ### Paid waiting queue, timing and priority
 
@@ -470,16 +470,17 @@ Cancelled history, receipt, deductions, refund progress and permitted order mess
 
 | Tier | Monthly NGN | Active cap | Delivery cap | Up Next | Pending | Paid jump offer |
 |---|---:|---:|---:|---:|---|---|
+| Free (no paid plan) | 0 | 1 | 2 | 1 | Unlimited | No |
 | Thread | 10,000 | 2 | 2 | 1 | Unlimited | No |
 | Aso-oke | 15,000 | 3 | 4 | 1 | Unlimited | No |
 | Aru | 30,000 | 4 | 5 | 1 | Unlimited | Brand opt-in |
 | Igwe | 50,000 | 6 | 5 | 1 | Unlimited | Brand opt-in |
 
-These are recurring monthly brand subscriptions, requiring express recurring-payment authorization; they are not shopper memberships. All brands require an active paid subscription with a verified payment before receiving new custom orders. Free storefront and standard-commerce access remain available without a custom-order subscription. Failed initial or switch payments never create free paid-tier access or erase the previous valid entitlement.
+These are recurring monthly brand subscriptions, requiring express recurring-payment authorization; they are not shopper memberships. A verified brand without a paid subscription in force is on the free plan: it may receive new custom orders with one (1) Active order at a time and two (2) in delivery, with no paid queue jump; capacity campaigns do not change the free plan, while a brand-specific override set by WIEZ still applies. Storefront and standard-commerce access remain available on the free plan. Failed initial or switch payments never create free paid-tier access or erase the previous valid entitlement.
 
 Existing agreements retain their agreed price snapshot on renewal; a new agreement or tier change uses current pricing. An upgrade applies immediately after verified payment of the difference prorated over the remaining billing period. A downgrade applies at the next renewal, with no refund for the current period. The monthly billing anniversary remains unchanged; a missing calendar day falls back to that month's last day. Billing dates are displayed in Lagos time (Africa/Lagos). Confirm the amount, renewal and effective capacity before payment.
 
-Voluntary cancellation stops future renewal; access remains through the paid-period end. At paid-period expiry, new intake pauses, while already-paid obligations continue. A failed renewal has seven days to recover at the existing locked price, with authorized retries on days 1, 3 and 7. This recovery window does not grant free intake. After it ends, a new subscription uses current prices. Payment-method authorization, billing receipts and invoice history remain available through billing support and the billing workspace.
+Voluntary cancellation stops future renewal; access remains through the paid-period end. At paid-period expiry the brand moves to the free plan: new custom orders continue at one Active order at a time; orders already Active continue, and waiting paid orders keep their place and move up as the Active seat frees. A failed renewal has seven days to recover at the existing locked price, with authorized retries on days 1, 3 and 7; during that window the brand is on the free plan. WIEZ tells the owner in the app inbox, by push notification and by email when renewal is cancelled; seven, three and one day(s) before a cancelled plan ends; when a renewal fails; three and one day(s) before the recovery window closes; three and one day(s) before a scheduled lower tier takes effect; and when the plan ends. The Studio and the billing workspace also show when the plan ends and how to subscribe again. These notices inform; the plan changes on the stated date whether or not a notice is read. After it ends, a new subscription uses current prices. Payment-method authorization, billing receipts and invoice history remain available through billing support and the billing workspace.
 
 Only one global capacity campaign may be active at a time. An automatic campaign ends at its exact configured deadline; a manual campaign remains effective until reset and is labelled accordingly. A brand-specific override wins over tier/campaign capacity and may have an expiry or be removed manually. Reduced capacity preserves existing work and pauses additional promotions until capacity permits. Runway notices, including notices called a free-order period, are informational and grant no financial discount or capacity change without explicit configuration. More than five brand cancellations of waiting orders in one action or a rolling 24 hours raises an admin attention alert; it does not automatically suspend the brand.
 

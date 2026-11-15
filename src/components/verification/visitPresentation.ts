@@ -1,4 +1,5 @@
 import type {
+  PhysicalVerificationMode,
   PhysicalVerificationStatus,
   PhysicalVerificationSummary,
 } from '@/api/PhysicalVerificationApi';
@@ -67,10 +68,50 @@ export const VISIT_STATUS_TONE: Record<PhysicalVerificationStatus, string> = {
   DECLINED: 'bg-rose-500/10 text-rose-700 dark:text-rose-300',
 };
 
+/**
+ * The same steps, as a live video call (free plan, owner Nov 2026). Only the
+ * steps whose words change are here; the rest read the same either way.
+ */
+const VIDEO_CALL_HEADLINE: Partial<
+  Record<PhysicalVerificationStatus, { title: string; body: string }>
+> = {
+  PENDING_ASSIGNMENT: {
+    title: 'Your video call is being arranged',
+    body: 'You chose a live video call. Someone will send you call times and a link shortly.',
+  },
+  ASSIGNED: {
+    title: 'Your video call is being arranged',
+    body: 'You chose a live video call. Someone will send you call times and a link shortly.',
+  },
+  SCHEDULE_PROPOSED: {
+    title: 'Choose a time for your video call',
+    body: 'Pick one of the times below, ask for a different one of them, or decline.',
+  },
+  SCHEDULE_CONFIRMED: {
+    title: 'Your video call is scheduled',
+    body: 'Join from the link below at that time. Show your workstation, your tools and your work — the reviewer takes screenshots as proof.',
+  },
+  RESCHEDULE_REQUESTED: {
+    title: 'Waiting on a reply to your new time',
+    body: 'We have asked the reviewer about the call time you chose.',
+  },
+  ON_HOLD: {
+    title: 'Your video call is postponed',
+    body: 'No time is set yet. New call times will be offered here.',
+  },
+  VISIT_COMPLETED: {
+    title: 'Your video call is being written up',
+    body: 'The reviewer is recording what they saw on the call.',
+  },
+};
+
 /** What the brand is being asked to do, in one line. Null when nothing. */
 export const brandVisitHeadline = (
   status: PhysicalVerificationStatus,
+  mode: PhysicalVerificationMode = 'IN_PERSON',
 ): { title: string; body: string } => {
+  const video = mode === 'VIDEO_CALL' ? VIDEO_CALL_HEADLINE[status] : undefined;
+  if (video) return video;
   switch (status) {
     case 'PENDING_ASSIGNMENT':
     case 'ASSIGNED':

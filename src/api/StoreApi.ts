@@ -1028,9 +1028,17 @@ export const getStoreWizardPrefill = async (): Promise<StoreWizardPrefillRespons
   return extractData<StoreWizardPrefillResponse>(res);
 };
 
-export const getStoreGeneralSettings = async (): Promise<StoreGeneralSettingsResponse> => {
-  const res = await apiClient.get('/store/settings/general');
-  return extractData<StoreGeneralSettingsResponse>(res);
+const assertSettingsWorkspace = (data: { brandId?: string }, expectedBrandId?: string | null) => {
+  if (!data || (expectedBrandId && data.brandId !== expectedBrandId)) {
+    throw new Error('Store settings belong to a different workspace. Please retry.');
+  }
+};
+
+export const getStoreGeneralSettings = async (options?: { signal?: AbortSignal; expectedBrandId?: string | null }): Promise<StoreGeneralSettingsResponse> => {
+  const res = await apiClient.get('/store/settings/general', { signal: options?.signal });
+  const data = extractData<StoreGeneralSettingsResponse>(res);
+  assertSettingsWorkspace(data, options?.expectedBrandId);
+  return data;
 };
 
 export const updateStoreName = async (payload: {
@@ -1057,15 +1065,20 @@ export const getCachedStoreStatus = (): StoreStatusResponse | null => {
   return null;
 };
 
-export const getStoreStatus = async (options?: { forceRefresh?: boolean }): Promise<StoreStatusResponse> => {
+export const getStoreStatus = async (options?: { forceRefresh?: boolean; expectedBrandId?: string | null }): Promise<StoreStatusResponse> => {
   const scope = getStoredAccessToken();
   const forceRefresh = options?.forceRefresh === true;
-  if (!forceRefresh && scope && storeStatusCache?.scope === scope && storeStatusCache.expiresAt > Date.now()) return storeStatusCache.data;
-  if (!forceRefresh && scope && storeStatusPending?.scope === scope) return storeStatusPending.promise;
+  if (!forceRefresh && scope && storeStatusCache?.scope === scope && storeStatusCache.expiresAt > Date.now() && (!options?.expectedBrandId || storeStatusCache.data.brandId === options.expectedBrandId)) return storeStatusCache.data;
+  if (!forceRefresh && scope && storeStatusPending?.scope === scope) {
+    const data = await storeStatusPending.promise;
+    if (options?.expectedBrandId && data.brandId !== options.expectedBrandId) throw new Error('Store setup status belongs to a different workspace. Please retry.');
+    return data;
+  }
   const pending = { scope: scope ?? '', promise: Promise.resolve(null as unknown as StoreStatusResponse) };
   pending.promise = (async () => {
     const res = await apiClient.get('/store/status');
     const data = extractData<StoreStatusResponse>(res);
+    if (!data || (options?.expectedBrandId && data.brandId !== options.expectedBrandId) || typeof data.isSetupComplete !== 'boolean') throw new Error('Store setup status is incomplete. Please retry.');
     // A late answer from a signed-out identity must never replace the next account's cache.
     if (scope && getStoredAccessToken() === scope && storeStatusPending === pending) {
       storeStatusCache = { data, scope, expiresAt: Date.now() + STORE_STATUS_TTL_MS };
@@ -1119,9 +1132,11 @@ export const updateWorkingHours = async (data: {
   return extractData(res);
 };
 
-export const getStorePolicies = async (): Promise<StorePoliciesResponse> => {
-  const res = await apiClient.get('/store/policies');
-  return extractData<StorePoliciesResponse>(res);
+export const getStorePolicies = async (options?: { signal?: AbortSignal; expectedBrandId?: string | null }): Promise<StorePoliciesResponse> => {
+  const res = await apiClient.get('/store/policies', { signal: options?.signal });
+  const data = extractData<StorePoliciesResponse>(res);
+  assertSettingsWorkspace(data, options?.expectedBrandId);
+  return data;
 };
 
 export const getStorePaymentAccount = async (): Promise<StorePaymentAccountResponse> => {

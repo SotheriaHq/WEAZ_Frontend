@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import { LEGAL_PAGE_VERSION } from '@/pages/legal/legalVersion';
 import { getFriendlyErrorMessage } from '@/utils/errorMessage';
 import { subscriptionQuoteRemainingMs } from '@/api/subscriptionQuote';
@@ -31,8 +32,10 @@ import { SubscriptionHistory } from '@/components/custom-orders/SubscriptionHist
 import { BrandQueueSettings } from '@/components/custom-orders/QueueBrandControls';
 import { SubscriptionPaymentMethods } from '@/components/custom-orders/SubscriptionPaymentMethods';
 import Button from '@/components/ui/Button';
+import { planNotice } from '@/lib/subscriptionPlanNotice';
+import { PlanNoticeBanner } from '@/components/custom-orders/PlanNoticeBanner';
 
-const money = (amount: number) =>
+const money =(amount: number) =>
   new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(
     amount,
   );
@@ -315,7 +318,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
       !(await confirm({
         title: 'Stop automatic renewal?',
         message:
-          'Your subscription remains available until the current paid period ends. New intake then pauses; existing paid orders continue to completion. The current paid period is not refunded.',
+          `Your plan stays in place until ${date(billing.data?.subscription?.currentPeriodEnd)}. Then your brand moves to the free plan: 1 active custom order at a time. Orders already active continue to completion, and waiting orders keep their place. You can subscribe again once it ends. The current paid period is not refunded.`,
         confirmText: 'Stop renewal',
         isDestructive: true,
       }))
@@ -345,6 +348,24 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
     );
 
   const tiers = billing.data?.tiers ?? [];
+  const notice = planNotice(
+    subscription,
+    tiers,
+    (key) => queueTierName(key ?? ''),
+    // Days are counted on the server's clock, not the device's.
+    billing.data?.serverNow ? Date.parse(billing.data.serverNow) : undefined,
+  );
+
+  function showPlans() {
+    setSection('plans');
+    // The tier grid exists once the Plans section has rendered.
+    requestAnimationFrame(() => {
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      document
+        .getElementById('billing-tiers')
+        ?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    });
+  }
 
   return (
     <div className="space-y-6 pb-12 text-slate-900 dark:text-white">
@@ -440,6 +461,20 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
         </div>
       )}
 
+      {/* Plan ending, lapsed or shrinking: on every section, never a surprise. */}
+      {notice ? (
+        <PlanNoticeBanner notice={notice}>
+          <Button variant="primary" size="sm" onClick={showPlans}>
+            See plans
+          </Button>
+          {subscription?.status === 'PAST_DUE' ? (
+            <Button variant="secondary" size="sm" onClick={() => setSection('cards')}>
+              Payment methods
+            </Button>
+          ) : null}
+        </PlanNoticeBanner>
+      ) : null}
+
       {/* Plans Section */}
       {section === 'plans' ? (
         <div className="space-y-6">
@@ -475,9 +510,9 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
                       {subscription.status}
                     </span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
+                  <SettingsSectionHeading className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
                     {queueTierName(subscription.tierKey)} Plan
-                  </h2>
+                  </SettingsSectionHeading>
                 </div>
                 <div className="text-left sm:text-right">
                   <span className="text-xl sm:text-2xl font-black text-purple-900 dark:text-purple-200">
@@ -529,7 +564,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
                 <div className="rounded-xl bg-amber-500/10 p-3.5 text-xs text-amber-800 dark:text-amber-200">
                   <p className="font-semibold">⚠️ Payment Recovery Period Active</p>
                   <p className="mt-1">
-                    Automatic retry attempts occur on days 1, 3, and 7 until {date(subscription.recoveryUntil)}, preserving your locked rate. New order intake pauses at paid expiry.
+                    Automatic retry attempts occur on days 1, 3, and 7 until {date(subscription.recoveryUntil)}, preserving your locked rate. Until it is recovered, your brand is on the free plan: 1 active custom order at a time.
                   </p>
                 </div>
               ) : null}
@@ -560,7 +595,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
             </div>
           ) : !billing.isPending && !billing.isError ? (
             /* Favored Free Tier Hero Card with 4 Mini Cards */
-            <div className="wiez-card-base wiez-shade-9 rounded-3xl p-5 sm:p-7 space-y-5 border-0">
+            <div className="wiez-card-base wiez-shade-9 rounded-3xl p-5 sm:p-7 space-y-5 border-0" data-settings-section>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2.5">
@@ -572,9 +607,9 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
                       ACTIVE FREE TIER
                     </span>
                   </div>
-                  <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
+                  <SettingsSectionHeading className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
                     WIEZ Creative Free Plan
-                  </h2>
+                  </SettingsSectionHeading>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Essential creative pipeline for independent designers & ateliers.
                   </p>
@@ -654,11 +689,11 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
           ) : null}
 
           {/* Tier Cards Grid (ITEM 25) */}
-          <div>
+          <div id="billing-tiers" className="scroll-mt-24">
             <div className="mb-4">
-              <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+              <SettingsSectionHeading className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
                 Available Studio Tiers
-              </h2>
+              </SettingsSectionHeading>
               <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                 Choose the capacity tier that fits your bespoke atelier pipeline.
               </p>
@@ -716,7 +751,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
                         <h3 className="text-base font-bold text-gray-900 dark:text-white">
                           {tier.label ?? tier.tierKey}
                         </h3>
-                        <div className="mt-1 flex items-baseline gap-1.5 flex-nowrap whitespace-nowrap">
+                        <div className="mt-1 flex flex-wrap items-baseline gap-1.5">
                           <span className="text-2xl font-black bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 dark:from-purple-400 dark:via-indigo-400 dark:to-pink-400 bg-clip-text text-transparent">
                             {money(tier.monthlyPriceNgn)}
                           </span>
@@ -809,11 +844,11 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
           </div>
 
           {/* Feature Comparison Matrix (ITEM 26) */}
-          <div className="wiez-card-base wiez-shade-10 rounded-3xl p-5 sm:p-7 space-y-4">
+          <div className="wiez-card-base wiez-shade-10 rounded-3xl p-5 sm:p-7 space-y-4" data-settings-section>
             <div>
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+              <SettingsSectionHeading as="h3" className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
                 Detailed Tier Comparison
-              </h3>
+              </SettingsSectionHeading>
               <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                 Understand full capacity and queue privileges across all four WIEZ tiers.
               </p>
@@ -893,9 +928,9 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
           {preview ? (
             <div data-settings-section className="space-y-5 py-5 animate-in fade-in duration-300">
               <div className="flex items-center justify-between">
-                <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                <SettingsSectionHeading as="h3" className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
                   Review & Confirm Plan Change: {queueTierName(selectedTier)}
-                </h3>
+                </SettingsSectionHeading>
                 <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200">
                   {preview.kind}
                 </span>
@@ -1064,10 +1099,10 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
       {/* History Section */}
       {section === 'history' ? (
         <div className="space-y-6">
-          <div className="wiez-card-base wiez-shade-10 rounded-3xl p-5 sm:p-7 space-y-4">
-            <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+          <div className="wiez-card-base wiez-shade-10 rounded-3xl p-5 sm:p-7 space-y-4" data-settings-section>
+            <SettingsSectionHeading className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
               Recent Invoices & Payment Recovery
-            </h2>
+            </SettingsSectionHeading>
             {billing.data?.invoices.length === 0 ? (
               <p className="text-xs sm:text-sm text-gray-500">No subscription invoices yet.</p>
             ) : (
@@ -1132,10 +1167,10 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
           </div>
 
           {(billing.data?.compensations?.length ?? 0) > 0 ? (
-            <div className="wiez-card-base wiez-shade-1 rounded-3xl p-5 sm:p-7 space-y-4">
-              <h2 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+            <div className="wiez-card-base wiez-shade-1 rounded-3xl p-5 sm:p-7 space-y-4" data-settings-section>
+              <SettingsSectionHeading className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
                 Subscription Payment Refunds
-              </h2>
+              </SettingsSectionHeading>
               <div className="divide-y divide-purple-100 dark:divide-purple-900/30">
                 {billing.data?.compensations?.map((item) => (
                   <article key={item.reference} className="py-3.5 first:pt-0 last:pb-0 space-y-1">

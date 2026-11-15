@@ -552,7 +552,7 @@ export const brandApi = {
   },
   async getVerificationStatus(
     brandId: string,
-    options?: { force?: boolean },
+    options?: { force?: boolean; signal?: AbortSignal },
   ): Promise<VerificationStatusResponse> {
     const force = Boolean(options?.force);
     const now = Date.now();
@@ -570,7 +570,7 @@ export const brandApi = {
     }
 
     const request = apiClient
-      .get(`/brands/${brandId}/verification`)
+      .get(`/brands/${brandId}/verification`, { signal: options?.signal })
       .then((response) => {
         const data = unwrapApiResponse<VerificationStatusResponse>(response.data);
         verificationStatusCache.set(brandId, {
@@ -586,8 +586,8 @@ export const brandApi = {
     verificationStatusPending.set(brandId, request);
     return request;
   },
-  async getVerificationDraft(brandId: string): Promise<VerificationDraftResponse> {
-    const response = await apiClient.get(`/brands/${brandId}/verification/draft`);
+  async getVerificationDraft(brandId: string, options?: { signal?: AbortSignal }): Promise<VerificationDraftResponse> {
+    const response = await apiClient.get(`/brands/${brandId}/verification/draft`, options);
     return unwrapApiResponse<VerificationDraftResponse>(response.data);
   },
   async saveVerificationDraft(
@@ -601,8 +601,8 @@ export const brandApi = {
     });
     return unwrapApiResponse<{ ok: true; lastSavedAt: string }>(response.data);
   },
-  async getVerificationLetter(brandId: string): Promise<VerificationLetterResponse> {
-    const response = await apiClient.get(`/brands/${brandId}/verification/letter`);
+  async getVerificationLetter(brandId: string, options?: { signal?: AbortSignal }): Promise<VerificationLetterResponse> {
+    const response = await apiClient.get(`/brands/${brandId}/verification/letter`, options);
     return unwrapApiResponse<VerificationLetterResponse>(response.data);
   },
   async signVerificationLetter(

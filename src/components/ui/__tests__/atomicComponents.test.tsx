@@ -35,6 +35,7 @@ describe('Atomic UI Components — Wave 2 Migration', () => {
       render(<Button variant="brand">Publish</Button>);
       const btn = screen.getByRole('button', { name: /publish/i });
       expect(btn).toHaveClass('wiez-lg-interactive');
+      expect(btn.className).not.toContain("active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]");
       expect(btn.className).toContain('active:scale-[0.98]');
     });
 

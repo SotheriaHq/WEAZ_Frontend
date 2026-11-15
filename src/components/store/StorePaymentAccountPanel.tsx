@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -711,6 +712,8 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
   return (
     <div
       id={PAYOUT_ACCOUNT_ANCHOR_ID}
+      data-settings-section={mode === 'settings' ? true : undefined}
+      data-settings-highlighted={mode === 'settings' && focused ? 'true' : undefined}
       ref={rootRef}
       /*
         Arriving from a failed payout has to LAND somewhere. Without this the
@@ -729,9 +732,7 @@ const StorePaymentAccountPanel: React.FC<StorePaymentAccountPanelProps> = ({
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            {sectionTitle}
-          </h2>
+          {mode === 'settings' ? <SettingsSectionHeading className="text-xl font-semibold text-gray-900 dark:text-white">{sectionTitle}</SettingsSectionHeading> : <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{sectionTitle}</h2>}
           <p className="max-w-3xl text-sm text-gray-600 dark:text-gray-400">
             {sectionDescription}
           </p>

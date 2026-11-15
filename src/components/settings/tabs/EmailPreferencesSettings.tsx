@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -557,8 +558,8 @@ const EmailPreferencesSettings: React.FC = () => {
 
       <div className="space-y-4">
         {groupedScenarios.map(({ group, items }) => (
-          <div key={group} className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-gray-950">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{group}</h2>
+          <div key={group} className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-gray-950" data-settings-section>
+            <SettingsSectionHeading className="text-lg font-semibold text-gray-900 dark:text-white">{group}</SettingsSectionHeading>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {GROUP_COPY[group] ?? 'Choose the email updates you want from this category.'}
             </p>

@@ -27,6 +27,13 @@ export type PhysicalVerificationBrandResponse =
   | 'RESCHEDULE_REQUESTED'
   | 'DECLINED';
 
+/**
+ * How the check happens. VIDEO_CALL is for brands on the free plan: a live
+ * call where the brand shows its workstation and tools, with the agent taking
+ * screenshots as proof (owner, Nov 2026).
+ */
+export type PhysicalVerificationMode = 'IN_PERSON' | 'VIDEO_CALL';
+
 export type PhysicalVerificationProofKind =
   | 'WORKSPACE'
   | 'PACKAGING'
@@ -61,6 +68,10 @@ export interface PhysicalVerificationSummary {
   brandRespondedAt: string | null;
   brandResponseNote: string | null;
   rescheduleCount: number;
+  mode: PhysicalVerificationMode;
+  /** The call link, for a video call. */
+  meetingUrl: string | null;
+  videoCallRequestedAt: string | null;
   visitCompletedAt: string | null;
   decidedAt: string | null;
   decisionNotes: string | null;
@@ -73,12 +84,16 @@ export interface PhysicalVerificationSummary {
 
 export interface PhysicalVerificationDetail extends PhysicalVerificationSummary {
   proofs: PhysicalVerificationProof[];
+  /** The brand is on the free plan, so this may run as a video call. */
+  videoCallAllowed: boolean;
 }
 
 /** What a brand sees: no agent identity, no evidence — just their own visit. */
 export interface BrandVisitView extends Omit<PhysicalVerificationSummary, 'assignedAgentId'> {
   canRespond: boolean;
   remainingReschedules: number;
+  /** Free plan, before the check: the brand may switch to a video call. */
+  canRequestVideoCall: boolean;
 }
 
 const unwrap = <T,>(payload: unknown): T => {
@@ -127,7 +142,13 @@ export const physicalVerificationApi = {
 
   async propose(
     id: string,
-    input: { slots: string[]; note?: string },
+    input: {
+      slots: string[];
+      note?: string;
+      /** VIDEO_CALL needs `meetingUrl` and a brand on the free plan. */
+      mode?: PhysicalVerificationMode;
+      meetingUrl?: string;
+    },
   ): Promise<PhysicalVerificationDetail> {
     const response = await apiClient.post(
       `/verification/physical/${encodeURIComponent(id)}/propose`,
@@ -204,6 +225,15 @@ export const physicalVerificationApi = {
     const response = await apiClient.post(
       `/brand/verification/physical/${encodeURIComponent(id)}/reply`,
       input,
+    );
+    return unwrap<BrandVisitView>(response.data);
+  },
+
+  /** Free plan: verify on a live video call instead of a visit. */
+  async requestVideoCall(id: string, note?: string): Promise<BrandVisitView> {
+    const response = await apiClient.post(
+      `/brand/verification/physical/${encodeURIComponent(id)}/video-call`,
+      note ? { note } : {},
     );
     return unwrap<BrandVisitView>(response.data);
   },

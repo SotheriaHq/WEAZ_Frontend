@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React, { useEffect } from 'react';
 import CategorySuggestionsSettings from './CategorySuggestionsSettings';
 import SubscriptionBillingSettings from './SubscriptionBillingSettings';
@@ -80,16 +81,16 @@ const LocationSettings: React.FC = () => {
         </p>
       </div>
 
-      <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5">
+      <div className="rounded-2xl border border-gray-200/80 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/5" data-settings-section>
         <div
           className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-2xl"
           aria-hidden="true"
         >
           📍
         </div>
-        <h2 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+        <SettingsSectionHeading className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
           Share your location?
-        </h2>
+        </SettingsSectionHeading>
         <p className="mb-5 max-w-xl text-sm leading-6 text-gray-600 dark:text-gray-300">
           WIEZ will always ask before using your location. Your precise location
           will not be shared with brands or other users from this screen.
@@ -153,10 +154,10 @@ const StoreDangerZone: React.FC = () => (
         Irreversible actions for your store. Proceed with caution.
       </p>
     </div>
-    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
-      <h3 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">
+    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6" data-settings-section>
+      <SettingsSectionHeading as="h3" className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">
         Close Store
-      </h3>
+      </SettingsSectionHeading>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
         Permanently close your store. All active listings will be removed and
         pending orders must be fulfilled first. This action cannot be undone.
@@ -165,10 +166,10 @@ const StoreDangerZone: React.FC = () => (
         Close Store
       </button>
     </div>
-    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6">
-      <h3 className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">
+    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6" data-settings-section>
+      <SettingsSectionHeading as="h3" className="text-lg font-medium text-red-600 dark:text-red-400 mb-2">
         Delete Store Data
-      </h3>
+      </SettingsSectionHeading>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
         Request permanent deletion of all store data including products, orders
         history, and analytics. This is irreversible.
@@ -302,7 +303,7 @@ const SettingsHome: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-surface-primary text-theme">
+    <div className="wiez-settings-screen min-h-screen bg-surface-primary text-theme">
       <SettingsSidebar active={resolvedActive} onSelect={setActive} />
 
       <div style={{ paddingLeft: "calc(var(--settings-sidebar-width, 240px) + 16px)" }} className="min-h-screen pb-10 pr-3 pt-4 text-[13px] md:pr-4 md:pt-6 md:text-base transition-[padding-left] duration-75">

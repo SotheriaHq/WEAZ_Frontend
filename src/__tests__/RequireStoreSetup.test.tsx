@@ -1,11 +1,17 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { configureStore } from '@reduxjs/toolkit';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render as renderUi, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import RequireStoreSetup from '@/components/store/RequireStoreSetup';
 import userReducer from '@/features/userSlice';
 
+function render(ui: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return renderUi(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 const getStoreStatus = vi.fn();
 
 vi.mock('@/api/StoreApi', () => ({

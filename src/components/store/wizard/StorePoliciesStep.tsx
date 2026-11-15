@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -25,6 +26,10 @@ import {
   STORE_RETURN_WINDOW_OPTIONS,
   STORE_SHIPPING_COUNTRIES,
 } from '@/utils/storePolicyConstraints';
+
+function PolicySectionHeading({ mode, ...props }: React.ComponentPropsWithoutRef<'h3'> & { mode: 'wizard' | 'settings' }) {
+  return mode === 'settings' ? <SettingsSectionHeading as="h3" {...props} /> : <h3 {...props} />;
+}
 
 interface StorePoliciesStepProps {
   data: StoreWizardData;
@@ -251,9 +256,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
       <div className="flex-1 flex items-start justify-center p-3 sm:p-6 lg:p-12 overflow-y-auto">
         <div className="w-full max-w-[900px]">
           {/* Glass Card Container */}
-          <div className="rounded-2xl overflow-hidden bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-[color:var(--border-default)]/50 dark:border-purple-500/10 shadow-xl">
+          <div className="rounded-2xl overflow-hidden bg-white/80 dark:bg-white/[0.03] backdrop-blur-xl border border-[color:var(--border-default)]/50 dark:border-purple-500/10 shadow-xl" data-settings-section={isSettingsMode ? true : undefined}>
             {!isSettingsMode && (
-              <div className="px-8 pt-8 pb-4 border-b border-[color:var(--border-default)]/50 dark:border-white/5">
+              <div className="px-8 pt-8 pb-4 border-b border-[color:var(--border-default)]/50 dark:border-white/5" data-settings-section={isSettingsMode ? true : undefined}>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-purple-600/20 flex items-center justify-center text-purple-600 dark:text-purple-400 text-sm font-bold border border-purple-500/30">
@@ -274,7 +279,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
             )}
 
             {/* Content Area */}
-            <div className="origin-top scale-[0.92] p-4 space-y-5 sm:scale-100 sm:p-8 sm:space-y-8">
+            <div className={`origin-top ${isSettingsMode ? '' : 'scale-[0.92] sm:scale-100'} p-4 space-y-5 sm:p-8 sm:space-y-8`}>
               {/* Header */}
               <div className="flex flex-row items-start justify-between gap-2 sm:gap-4">
                 <div className="min-w-0 flex-1 space-y-1">
@@ -297,14 +302,14 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
               {/* Policy Cards Grid */}
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
                 {/* Shipping Policy Card */}
-                <div className="space-y-4 rounded-xl border border-[color:var(--border-default)]/50 bg-[color:var(--surface-secondary)]/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6">
+                <div className="space-y-4 rounded-xl border border-[color:var(--border-default)]/50 bg-[color:var(--surface-secondary)]/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6" data-settings-section={isSettingsMode ? true : undefined}>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400">
                       <Package className="w-5 h-5" />
                     </div>
-                    <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
+                    <PolicySectionHeading mode={mode} className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
                       Shipping Policy
-                    </h3>
+                    </PolicySectionHeading>
                   </div>
 
                   {/* Shipping Regions */}
@@ -421,15 +426,15 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 </div>
 
                 {/* Returns Policy Card */}
-                <div className="space-y-4 rounded-xl border border-[color:var(--border-default)]/50 bg-[color:var(--surface-secondary)]/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6">
+                <div className="space-y-4 rounded-xl border border-[color:var(--border-default)]/50 bg-[color:var(--surface-secondary)]/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6" data-settings-section={isSettingsMode ? true : undefined}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-600 dark:text-orange-400">
                         <RotateCcw className="w-5 h-5" />
                       </div>
-                      <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
+                      <PolicySectionHeading mode={mode} className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
                         Returns & Exchanges
-                      </h3>
+                      </PolicySectionHeading>
                     </div>
                     {/* Returns Toggle */}
                     <button
@@ -518,14 +523,14 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 </div>
 
                 {/* Orders Card */}
-                <div className="space-y-4 rounded-xl border border-[color:var(--border-default)]/50 bg-[color:var(--surface-secondary)]/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6">
+                <div className="space-y-4 rounded-xl border border-[color:var(--border-default)]/50 bg-[color:var(--surface-secondary)]/50 p-4 dark:border-white/5 dark:bg-white/[0.02] sm:space-y-5 sm:p-6" data-settings-section={isSettingsMode ? true : undefined}>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-lg">
                       🧾
                     </div>
-                    <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
+                    <PolicySectionHeading mode={mode} className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
                       Orders
-                    </h3>
+                    </PolicySectionHeading>
                   </div>
 
                   {/* The "System managed" notice is gone. It described an
@@ -563,7 +568,7 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                     </div>
                   </label>
 
-                  <div className="pt-1 border-t border-[color:var(--border-default)]/70 dark:border-white/10 space-y-2">
+                  <div className="pt-1 border-t border-[color:var(--border-default)]/70 dark:border-white/10 space-y-2" data-settings-section={isSettingsMode ? true : undefined}>
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium text-[color:var(--text-primary)] dark:text-gray-300">
                         Accept custom orders
@@ -632,9 +637,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                         <Ruler className="w-5 h-5" />
                       </div>
                       <div className="text-left">
-                        <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
+                        <PolicySectionHeading mode={mode} className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
                           Size Chart
-                        </h3>
+                        </PolicySectionHeading>
                         <p className="text-xs text-[color:var(--text-secondary)]">
                           {data.sizeChartPresetKey ? `Using ${data.sizeChartPresetKey}` : 'Tap to configure'}
                         </p>
@@ -793,9 +798,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 
 
 {/* Size Chart Card - Collapsible - lg:col-span-2 for wide modern layout */}
-                <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-gray-50/80 to-white/50 dark:from-white/[0.02] dark:to-white/[0.01] border border-[color:var(--border-default)]/80 dark:border-white/10 p-3 sm:p-6 space-y-4 sm:space-y-6 shadow-sm overflow-hidden relative">
+                <div data-settings-section={isSettingsMode ? true : undefined} className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-gray-50/80 to-white/50 dark:from-white/[0.02] dark:to-white/[0.01] border border-[color:var(--border-default)]/80 dark:border-white/10 p-3 sm:p-6 space-y-4 sm:space-y-6 shadow-sm overflow-hidden relative">
                   {/* Decorative modern background element */}
-                  <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-emerald-400/5 dark:bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+                  {!isSettingsMode ? <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-emerald-400/5 dark:bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" /> : null}
                   
                   <button
                     type="button"
@@ -807,14 +812,14 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                         <Ruler className="w-6 h-6" />
                       </div>
                       <div className="text-left">
-                        <h3 className="text-xl font-bold text-[color:var(--text-primary)] dark:text-white tracking-tight flex items-center gap-2">
+                        <PolicySectionHeading mode={mode} className="text-xl font-bold text-[color:var(--text-primary)] dark:text-white tracking-tight flex items-center gap-2">
                           Size Chart Configurator
                           {(data.sizeChartPresetKey || data.sizeChartUrl) ? (
                             <span className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                               <Check className="w-3 h-3" /> Configured
                             </span>
                           ) : null}
-                        </h3>
+                        </PolicySectionHeading>
                         <p className="text-sm text-[color:var(--text-secondary)] dark:text-gray-400 mt-1">
                           {data.sizeChartPresetKey ? `Active: ${SIZE_CHARTS.find(c => c.id === data.sizeChartPresetKey)?.title || data.sizeChartPresetKey}` : 'Choose a predefined sizing lane or upload your custom reference.'}
                         </p>
@@ -1009,9 +1014,9 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                         <Ruler className="w-5 h-5" />
                       </div>
                       <div className="text-left">
-                        <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
+                        <PolicySectionHeading mode={mode} className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
                           Size Chart
-                        </h3>
+                        </PolicySectionHeading>
                         <p className="text-xs text-[color:var(--text-secondary)]">
                           {data.sizeChartPresetKey ? `Using ${data.sizeChartPresetKey}` : 'Tap to configure'}
                         </p>
@@ -1168,14 +1173,14 @@ const StorePoliciesStep: React.FC<StorePoliciesStepProps> = ({
                 </div>
 
                 {/* Customer Contact Card */}
-                <div className="rounded-xl bg-[color:var(--surface-secondary)]/50 dark:bg-white/[0.02] border border-[color:var(--border-default)]/50 dark:border-white/5 p-6 space-y-4">
+                <div data-settings-section={isSettingsMode ? true : undefined} className="rounded-xl bg-[color:var(--surface-secondary)]/50 dark:bg-white/[0.02] border border-[color:var(--border-default)]/50 dark:border-white/5 p-6 space-y-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-600 dark:text-purple-400">
                       <Clock className="w-5 h-5" />
                     </div>
-                    <h3 className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
+                    <PolicySectionHeading mode={mode} className="text-lg font-semibold text-[color:var(--text-primary)] dark:text-white">
                       Customer Contact
-                    </h3>
+                    </PolicySectionHeading>
                   </div>
 
                   {/* Response Time SLA */}

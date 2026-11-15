@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/query/queryKeys';
+import React, { useCallback, useMemo, useState, useLayoutEffect, useRef } from 'react';
+import { useSelector } from 'react-redux';
+import type { RootState } from '@/store';
+import { getActiveBrandId } from '@/lib/brandAccess';
 import { Select } from '@/components/ui/Select';
 import {
   Store,
@@ -60,8 +66,21 @@ const normalizeSpecializationSelection = (values: string[]): string[] => {
   return result.slice(0, MAX_SPECIALIZATIONS);
 };
 
-const StoreGeneralSettings: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(true);
+const StoreGeneralSettingsContent: React.FC = () => {
+  const actor = useSelector((state: RootState) => state.user.profile);
+  const client = useQueryClient();
+  const actorId = actor?.id;
+  const brandId = getActiveBrandId(actor);
+  const settingsKey = queryKeys.store.generalSettings(actorId, brandId);
+  const resource = useQuery({
+    queryKey: settingsKey,
+    enabled: Boolean(actorId && brandId),
+    queryFn: ({ signal }) => getStoreGeneralSettings({ signal, expectedBrandId: brandId }),
+    select: (data) => data.brandId === brandId ? data : undefined,
+    refetchOnMount: true,
+  });
+  const isLoading = !resource.data;
+  const dirtyRef = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [isSavingName, setIsSavingName] = useState(false);
@@ -97,42 +116,26 @@ const StoreGeneralSettings: React.FC = () => {
     });
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  useLayoutEffect(() => {
+    const settings = resource.data;
+    if (!settings || dirtyRef.current) return;
+    setStoreName(settings.storeName || '');
+    setSlug(settings.slug || '');
+    setTagline(settings.tagline || '');
+    setDescription(settings.description || '');
+    setContactEmail(settings.contactEmail || '');
+    setContactEmailPublic(Boolean(settings.contactEmailPublic));
+    setSelectedCategories(normalizeSpecializationSelection(settings.tags || []));
+    setResponseTime(resolveResponseTime(settings.responseTimeSla));
+    setIsLive(Boolean(settings.isStoreOpen));
+    setInitialSettings(settings);
+  }, [resource.data]);
 
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const settings = await getStoreGeneralSettings();
-        if (cancelled) return;
-
-        setStoreName(settings.storeName || '');
-        setSlug(settings.slug || '');
-        setTagline(settings.tagline || '');
-        setDescription(settings.description || '');
-        setContactEmail(settings.contactEmail || '');
-        setContactEmailPublic(Boolean(settings.contactEmailPublic));
-        setSelectedCategories(normalizeSpecializationSelection(settings.tags || []));
-        setResponseTime(resolveResponseTime(settings.responseTimeSla));
-        setIsLive(Boolean(settings.isStoreOpen));
-        setInitialSettings(settings);
-      } catch (error) {
-        console.error('Failed to load store settings', error);
-        toast.error('Failed to load store settings. Please refresh and try again.');
-      }
-
-      finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const refreshSavedSettings = () => {
+    void client.invalidateQueries({ queryKey: settingsKey });
+    void client.invalidateQueries({ queryKey: queryKeys.store.policies(actorId, brandId) });
+    void client.invalidateQueries({ queryKey: queryKeys.store.status(actorId, brandId) });
+  };
 
   const storeNameChanged = initialSettings ? storeName.trim() !== initialSettings.storeName : false;
   const normalizedTagSnapshot = selectedCategories.slice().sort().join('|');
@@ -143,10 +146,13 @@ const StoreGeneralSettings: React.FC = () => {
       tagline.trim() !== (initialSettings.tagline || '') ||
       description.trim() !== (initialSettings.description || '') ||
       contactEmail.trim() !== (initialSettings.contactEmail || '') ||
+      contactEmailPublic !== Boolean(initialSettings.contactEmailPublic) ||
       normalizedTagSnapshot !== normalizedInitialTags ||
       responseTime !== resolveResponseTime(initialSettings.responseTimeSla)
     )
   );
+
+  dirtyRef.current = isDirty || storeNameChanged || Boolean(storeNamePassword);
 
   const nextNameChangeAt = initialSettings?.storeNameNextAllowedAt
     ? new Date(initialSettings.storeNameNextAllowedAt)
@@ -158,7 +164,7 @@ const StoreGeneralSettings: React.FC = () => {
 
     setIsSaving(true);
     try {
-      await Promise.all([
+      const writes = await Promise.allSettled([
         updateStoreProfile({
           tagline: tagline.trim(),
           description: description.trim(),
@@ -171,6 +177,8 @@ const StoreGeneralSettings: React.FC = () => {
         }),
       ]);
 
+      const failedWrite = writes.find((result) => result.status === 'rejected');
+      if (failedWrite?.status === 'rejected') throw failedWrite.reason;
       setInitialSettings({
         ...initialSettings,
         tagline: tagline.trim(),
@@ -187,6 +195,7 @@ const StoreGeneralSettings: React.FC = () => {
       toast.error('Failed to save store settings. Please try again.');
     } finally {
       setIsSaving(false);
+      refreshSavedSettings();
     }
   };
 
@@ -205,6 +214,7 @@ const StoreGeneralSettings: React.FC = () => {
       setStoreName(updated.storeName || '');
       setSlug(updated.slug || '');
       setInitialSettings(updated);
+      client.setQueryData(settingsKey, updated);
       setStoreNamePassword('');
       toast.success('Store name updated.');
     } catch (error) {
@@ -232,9 +242,12 @@ const StoreGeneralSettings: React.FC = () => {
       // Closing/pausing must NOT flip "setup complete" to false — a paused
       // store is still fully set up.
       if (nextLiveState) {
-        primeStoreSetupStatusCache(true);
+        if (actor?.id) primeStoreSetupStatusCache(true, actor.id, getActiveBrandId(actor));
       }
       setIsLive(nextLiveState);
+      setInitialSettings((previous) => previous ? { ...previous, isStoreOpen: nextLiveState } : previous);
+      client.setQueryData<StoreGeneralSettingsResponse>(settingsKey, (previous) => previous ? { ...previous, isStoreOpen: nextLiveState } : previous);
+      refreshSavedSettings();
       toast.success(nextLiveState ? 'Store is now live.' : 'Store is now paused.');
     } catch (error: any) {
       console.error('Failed to update store status', error);
@@ -253,6 +266,11 @@ const StoreGeneralSettings: React.FC = () => {
   };
 
   const colorPresets = ['#3B82F6', '#8B5CF6', '#10B981', '#EF4444', '#F59E0B'];
+
+  if (!resource.data && resource.error) return <div role="alert" className="space-y-4">
+    <p>We could not load your saved store settings. Retry before editing.</p>
+    <button type="button" className="rounded-xl bg-primary px-4 py-3 text-white focus-visible:ring-2" onClick={() => void resource.refetch()}>Retry settings</button>
+  </div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -274,11 +292,11 @@ const StoreGeneralSettings: React.FC = () => {
       </div>
 
       {/* Basic Information */}
-      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6 lg:p-8">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6 lg:p-8" data-settings-section>
+        <SettingsSectionHeading className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
           <Store className="w-5 h-5 text-purple-500" />
           Basic Information
-        </h2>
+        </SettingsSectionHeading>
 
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -431,11 +449,11 @@ const StoreGeneralSettings: React.FC = () => {
       </section>
 
       {/* Branding */}
-      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6 lg:p-8">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+      <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6 lg:p-8" data-settings-section>
+        <SettingsSectionHeading className="text-lg font-semibold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
           <Palette className="w-5 h-5 text-purple-500" />
           Branding
-        </h2>
+        </SettingsSectionHeading>
 
         <div className="space-y-8">
           {/* Store images are profile-derived (read-only here) */}
@@ -502,12 +520,12 @@ const StoreGeneralSettings: React.FC = () => {
       {/* Store Status & Response Time Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Store Status */}
-        <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6">
+        <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6" data-settings-section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <SettingsSectionHeading className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <Power className="w-5 h-5 text-purple-500" />
               Store Status
-            </h2>
+            </SettingsSectionHeading>
             <span
               className={`px-2.5 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 ${
                 isLive
@@ -525,7 +543,7 @@ const StoreGeneralSettings: React.FC = () => {
               : 'Your store is paused and not accepting new orders.'}
           </p>
 
-          <div className="flex items-center justify-between bg-gray-50 dark:bg-white/5 rounded-lg p-4 border border-gray-200 dark:border-white/5">
+          <div className="flex items-center justify-between bg-gray-50 dark:bg-white/5 rounded-lg p-4 border border-gray-200 dark:border-white/5" data-settings-section>
             <div>
               <h3 className="text-sm font-medium text-gray-900 dark:text-white">Need a break?</h3>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Temporarily pause new orders.</p>
@@ -547,12 +565,12 @@ const StoreGeneralSettings: React.FC = () => {
         </section>
 
         {/* Response Time */}
-        <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6">
+        <section className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-white/10 p-6" data-settings-section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <SettingsSectionHeading className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
               <Clock className="w-5 h-5 text-purple-500" />
               Response Time
-            </h2>
+            </SettingsSectionHeading>
           </div>
 
           <div className="space-y-4">
@@ -616,4 +634,7 @@ const StoreGeneralSettings: React.FC = () => {
   );
 };
 
-export default StoreGeneralSettings;
+export default function StoreGeneralSettings() {
+  const actor = useSelector((state: RootState) => state.user.profile);
+  return <StoreGeneralSettingsContent key={JSON.stringify([actor?.id, getActiveBrandId(actor)])} />;
+}

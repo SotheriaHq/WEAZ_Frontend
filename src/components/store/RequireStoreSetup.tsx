@@ -1,18 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { getStoreStatus, type StoreStatusResponse } from '@/api/StoreApi';
+import { useStoreStatusQuery } from '@/query/queries';
+import { queryClient } from '@/query/queryClient';
+import { queryKeys } from '@/query/queryKeys';
 import type { RootState } from '@/store';
 import {
   clearStoreOpenPending,
   isBrandProfileComplete,
-  isStoreOpenPending,
   resolveBrandProfileSetupDestination,
   resolveStoreSetupDestination,
-  sleep,
 } from '@/utils/storeSetup';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
-import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import { getActiveBrandId, hasActiveBrandMembership, isBrandAccount } from '@/lib/brandAccess';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
 /**
@@ -43,126 +43,20 @@ export const describeMissingProfileFields = (
   return `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`;
 };
 
-const STATUS_RETRY_ATTEMPTS = 5;
-const STATUS_RETRY_DELAY_MS = 600;
-const STORE_STATUS_CACHE_TTL_MS = 5 * 60 * 1000;
-
-type StoreStatusCache = {
-  status: StoreStatusResponse | null;
-  hadError: boolean;
-  checkedAt: number;
-};
-
-let storeStatusCache: StoreStatusCache = {
-  status: null,
-  hadError: false,
-  checkedAt: 0,
-};
-
-let storeStatusCacheUserId: string | null = null;
-
-let inFlightStoreStatusCheck: Promise<StoreStatusCache> | null = null;
-let inFlightStoreStatusCheckUserId: string | null = null;
-
-/**
- * Reset this guard's module-level status cache so the next render refetches.
- * Call after mutating anything the gate depends on (e.g. saving working hours),
- * otherwise a published brand — whose fresh cache short-circuits the refetch —
- * could keep being redirected by a stale `businessHoursConfigured` for up to the
- * cache TTL.
- */
+/** Keep mutation callers on the same cache used by every Studio screen. */
 export function invalidateRequireStoreSetupCache(): void {
-  storeStatusCache = { status: null, hadError: false, checkedAt: 0 };
-  storeStatusCacheUserId = null;
+  void queryClient.invalidateQueries({ queryKey: queryKeys.store.status() });
 }
-
-const normalizeCacheUserId = (userId?: string | null): string | null => {
-  const candidate = String(userId ?? '').trim();
-  return candidate.length > 0 ? candidate : null;
-};
-
-const isCacheFresh = (userId?: string | null) =>
-  storeStatusCacheUserId === normalizeCacheUserId(userId) &&
-  storeStatusCache.checkedAt > 0 &&
-  Date.now() - storeStatusCache.checkedAt < STORE_STATUS_CACHE_TTL_MS;
-
-const canServeFromCache = (userId?: string | null) =>
-  isCacheFresh(userId) &&
-  !storeStatusCache.hadError &&
-  Boolean(storeStatusCache.status?.isSetupComplete);
-
-const fetchStoreStatusWithRetry = async (
-  userId?: string | null,
-): Promise<StoreStatusCache> => {
-  const shouldRetryForPendingOpen = isStoreOpenPending(userId);
-  const maxAttempts = shouldRetryForPendingOpen ? STATUS_RETRY_ATTEMPTS : 1;
-  let nextStatus: StoreStatusResponse | null = null;
-  let sawError = false;
-
-  try {
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      try {
-        nextStatus = await getStoreStatus();
-        sawError = false;
-        if (nextStatus?.isStoreOpen) {
-          clearStoreOpenPending(userId);
-          break;
-        }
-      } catch {
-        sawError = true;
-      }
-
-      if (attempt < maxAttempts - 1) {
-        await sleep(STATUS_RETRY_DELAY_MS);
-      }
-    }
-  } catch {
-    sawError = true;
-  }
-
-  const nextCache: StoreStatusCache = {
-    status: nextStatus,
-    hadError: Boolean(sawError && !nextStatus),
-    checkedAt: Date.now(),
-  };
-
-  storeStatusCache = nextCache;
-  storeStatusCacheUserId = normalizeCacheUserId(userId);
-  return nextCache;
-};
-
-const getCachedOrFetchStoreStatus = async (
-  userId?: string | null,
-): Promise<StoreStatusCache> => {
-  const normalizedUserId = normalizeCacheUserId(userId);
-  if (
-    inFlightStoreStatusCheck &&
-    inFlightStoreStatusCheckUserId === normalizedUserId
-  ) {
-    return inFlightStoreStatusCheck;
-  }
-
-  inFlightStoreStatusCheckUserId = normalizedUserId;
-  inFlightStoreStatusCheck = fetchStoreStatusWithRetry(userId).finally(() => {
-    inFlightStoreStatusCheck = null;
-    inFlightStoreStatusCheckUserId = null;
-  });
-
-  return inFlightStoreStatusCheck;
-};
 
 const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const user = useSelector((state: RootState) => state.user.profile);
   const embeddedSurface = useEmbeddedSurface();
   const isEmbeddedMobile = embeddedSurface === 'mobile-app';
-  const [status, setStatus] = useState<StoreStatusResponse | null>(() =>
-    isCacheFresh(user?.id) ? storeStatusCache.status : null,
-  );
-  const [loading, setLoading] = useState(() => !canServeFromCache(user?.id));
-  const [hadError, setHadError] = useState(() =>
-    isCacheFresh(user?.id) ? storeStatusCache.hadError : false,
-  );
+  const statusQuery = useStoreStatusQuery({ enabled: isBrandAccount(user) });
+  const status = statusQuery.data ?? null;
+  const loading = statusQuery.isPending;
+  const hadError = statusQuery.isError;
 
   const isSetupRoute = useMemo(() => {
     return (
@@ -195,59 +89,36 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     status?.profileMissingFields,
   );
 
+  const notifiedGate = useRef<string | null>(null);
+  const workspaceId = getActiveBrandId(user);
   useEffect(() => {
-    let mounted = true;
+    if (!isEmbeddedMobile || (!isSetupRoute && !status)) return;
+    const reason = requiresEmailVerification ? 'email-verification'
+      : requiresProfileCompletion ? 'brand-profile' : null;
+    if (!reason) { notifiedGate.current = null; return; }
+    const path = reason === 'email-verification' ? verificationPromptDestination : brandProfileSetupDestination;
+    const signature = JSON.stringify([user?.id, workspaceId, reason, path, status?.profileMissingFields]);
+    if (notifiedGate.current === signature) return;
+    notifiedGate.current = signature;
+    postStudioNativeEvent({ type: 'PROFILE_SETUP_REQUIRED', reason, path,
+      ...(reason === 'brand-profile' && status?.profileMissingFields ? { missingFields: status.profileMissingFields } : {}) });
+  }, [isEmbeddedMobile, isSetupRoute, status, requiresEmailVerification, requiresProfileCompletion,
+    verificationPromptDestination, brandProfileSetupDestination, user?.id, workspaceId]);
 
-    if (isCacheFresh(user?.id)) {
-      setStatus(storeStatusCache.status);
-      setHadError(storeStatusCache.hadError);
-      setLoading(false);
-    }
-
-    if (canServeFromCache(user?.id)) {
-      return () => {
-        mounted = false;
-      };
-    }
-
-    const shouldBlockWithLoader =
-      !isCacheFresh(user?.id) ||
-      !storeStatusCache.status?.isSetupComplete ||
-      storeStatusCache.hadError;
-    if (shouldBlockWithLoader) {
-      setLoading(true);
-      setHadError(false);
-    }
-
-    const run = async () => {
-      const nextCache = await getCachedOrFetchStoreStatus(user?.id);
-      if (!mounted) return;
-      setStatus(nextCache.status);
-      setHadError(nextCache.hadError);
-      if (shouldBlockWithLoader) {
-        setLoading(false);
-      }
-    };
-
-    void run();
-    return () => {
-      mounted = false;
-    };
-  }, [isSetupRoute, user?.id]);
+  if (!isSetupRoute && !status) {
+    if (loading && !hadError) return <div role="status" className="p-6">Checking store setup…</div>;
+    return <div role="alert" className="space-y-4 p-6">
+      <p>We could not check your store setup. Your work has been preserved.</p>
+      <button type="button" onClick={() => { void statusQuery.refetch(); }}
+        className="rounded-xl bg-primary px-4 py-3 text-white">Retry setup check</button>
+    </div>;
+  }
 
   if (requiresEmailVerification) {
     if (isEmbeddedMobile) {
-      // `reason` lets the native shell route: these two blocks post the same
-      // event type but need different destinations, and without it the shell
-      // cannot tell an unverified email from an unfinished brand profile.
-      postStudioNativeEvent({
-        type: 'PROFILE_SETUP_REQUIRED',
-        reason: 'email-verification',
-        path: verificationPromptDestination,
-      });
       return (
         <div className="flex min-h-screen items-center justify-center bg-white px-5 text-slate-900 dark:bg-black dark:text-white">
-          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-white/10 dark:bg-zinc-950">
+          <div className="w-full max-w-sm p-5 text-center">
             <div className="text-base font-semibold">Email verification required</div>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
               Return to the app to complete verification before opening Studio.
@@ -261,17 +132,9 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
 
   if (requiresProfileCompletion) {
     if (isEmbeddedMobile) {
-      postStudioNativeEvent({
-        type: 'PROFILE_SETUP_REQUIRED',
-        reason: 'brand-profile',
-        ...(status?.profileMissingFields
-          ? { missingFields: status.profileMissingFields }
-          : null),
-        path: brandProfileSetupDestination,
-      });
       return (
         <div className="flex min-h-screen items-center justify-center bg-white px-5 text-slate-900 dark:bg-black dark:text-white">
-          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 text-center shadow-sm dark:border-white/10 dark:bg-zinc-950">
+          <div className="w-full max-w-sm p-5 text-center">
             <div className="text-base font-semibold">Finish your brand profile</div>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
               {missingProfileFieldsLabel
@@ -289,9 +152,6 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
     return <>{children}</>;
   }
 
-  if (loading) {
-    return <>{children}</>;
-  }
 
   // Business Hours hard gate, for ALREADY-PUBLISHED stores only.
   //
@@ -308,7 +168,6 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
   // store that does not exist yet. Only acts on a cleanly loaded status so a
   // failed request never gates anyone.
   if (
-    !hadError &&
     status &&
     status.isPublished === true &&
     status.workingHoursRequired === true &&
@@ -319,24 +178,13 @@ const RequireStoreSetup: React.FC<{ children: React.ReactNode }> = ({ children }
 
   // Setup complete → allow Studio regardless of open/paused, so a paused store is
   // never redirected back into the setup flow. Clear pending only once truly open.
-  if (status?.isSetupComplete) {
+  if (status?.isSetupComplete === true) {
     if (status.isStoreOpen) clearStoreOpenPending(user?.id);
     return <>{children}</>;
   }
 
-  if (isStoreOpenPending(user?.id)) {
-    return <>{children}</>;
-  }
 
   const destination = resolveStoreSetupDestination(user?.id);
-  if (hadError || !status) {
-    return <>{children}</>;
-  }
-
-  if (status.isSetupComplete) {
-    return <>{children}</>;
-  }
-
   if (isEmbeddedMobile) {
     const params = new URLSearchParams(location.search);
     const embeddedTheme = params.get('theme');

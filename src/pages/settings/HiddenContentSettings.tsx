@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, EyeOff, RefreshCcw, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -62,7 +63,7 @@ const getSuppressionSubtitle = (suppression: MarketSuppression) => {
 };
 
 const EmptyState = () => (
-  <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center dark:border-white/10 dark:bg-gray-950">
+  <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center dark:border-white/10 dark:bg-gray-950" data-settings-section>
     <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300">
       <EyeOff className="h-5 w-5" />
     </div>
@@ -202,16 +203,16 @@ export const HiddenContentSettings: React.FC = () => {
         </p>
       </div>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-950">
+      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-950" data-settings-section>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <EyeOff className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <SettingsSectionHeading className="text-lg font-semibold text-gray-900 dark:text-white">
                 Hidden / Not Interested Content
-              </h2>
+              </SettingsSectionHeading>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 Restored items become eligible for future market sections and suggestion blocks.
               </p>
@@ -255,7 +256,7 @@ export const HiddenContentSettings: React.FC = () => {
           ) : visibleSuppressions.length === 0 ? (
             <EmptyState />
           ) : (
-            <div className="divide-y divide-gray-200 rounded-xl border border-gray-200 dark:divide-white/10 dark:border-white/10">
+            <div className="divide-y divide-gray-200 rounded-xl border border-gray-200 dark:divide-white/10 dark:border-white/10" data-settings-section>
               {visibleSuppressions.map((suppression) => (
                 <div
                   key={suppression.id}
@@ -263,7 +264,7 @@ export const HiddenContentSettings: React.FC = () => {
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                      <h3 className="break-words text-sm font-semibold text-gray-900 dark:text-white">
                         {getSuppressionLabel(suppression)}
                       </h3>
                       <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300">
@@ -293,12 +294,12 @@ export const HiddenContentSettings: React.FC = () => {
         </div>
       </section>
 
-      <section className="rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-900/30 dark:bg-amber-900/10">
+      <section className="rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-900/30 dark:bg-amber-900/10" data-settings-section>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-amber-900 dark:text-amber-100">
+            <SettingsSectionHeading className="text-lg font-semibold text-amber-900 dark:text-amber-100">
               Reset market preferences
-            </h2>
+            </SettingsSectionHeading>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-800 dark:text-amber-200">
               This records a fresh baseline for your market preferences. It does not delete your account, orders, saved items, products, collections, profile data, or hidden content list.
             </p>

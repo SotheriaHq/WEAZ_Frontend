@@ -1,8 +1,8 @@
 # WIEZ Master Privacy Policy and Data Governance Directive
 
-**Effective Date:** October 23, 2026
+**Effective Date:** November 11, 2026
 
-**Document Version:** 2026.10.23-v1.6
+**Document Version:** 2026.11.11-v1.7
 
 **Applies To:** Web (`wiez.com`, `fthreadly`), Mobile Applications (iOS / Android / `threadly-mobile`), Brand Studio Workspaces, Escrow Ledger Services, and all platform APIs.
 
@@ -42,7 +42,7 @@ We collect information directly from you, automatically through your platform us
 | --- | --- |
 | **1. Account & Identity Data** | First name, last name, @username handle, email address, password hash (Argon2id), normalized E.164 phone number, avatar image, banner image, country, state, city/LGA. |
 | **2. Bespoke Body Measurements** *(High-Trust Tailoring Data)* | Up to 38 distinct ISO 8559 tailoring points (bust, waist, hips, inseam, torso length, shoulder span, neck), SVG silhouette coordinate maps, and fitting notes. |
-| **3. Brand Studio Verification (KYC)** *(Strictly Isolated Storage)* | Corporate registration certificates (CAC documents), Tax IDs (TIN), director government IDs (Passport/NIN/License), utility bills, and bank payout account details. |
+| **3. Brand Studio Verification (KYC)** *(Strictly Isolated Storage)* | Corporate registration certificates (CAC documents), Tax IDs (TIN), director government IDs (Passport/NIN/License), utility bills, bank payout account details, and physical-verification evidence (photographs, or screenshots from a verification video call, of the workspace). |
 | **4. Commerce & Transactional Data** | Multi-vendor bag items, order timestamps, shipping address, recipient contact numbers, bespoke cutting milestone logs, return requests, and customer support tickets. |
 | **5. Financial & Escrow Tokens** *(PCI-DSS Compliant)* | Payment gateway transaction references, masked last-4 card digits, card brand, tokenized authorization hashes, escrow pending balances, and settlement ledger payout IDs. |
 | **6. Social Runway & UGC Media** | Design showcase photos, video lookbooks, styling tags, captions, likes, bookmarks/saves, comments, and reviews. |
@@ -101,6 +101,9 @@ All Brand KYC documents are uploaded via cryptographically signed temporary URLs
 
 ### 5.3. Public API Mathematical Redaction
 To protect Brand owners from identity theft, our public backend APIs (`GET /brands/:id`, `GET /brands/username/:handle`) strictly redact all corporate registration numbers, TINs, owner personal emails, and banking coordinates for all public visitor requests.
+
+### 5.4. Physical Verification Evidence
+To complete verification, a WIEZ agent checks the Brand's workspace in person or, for Brands on the free plan who choose it, on a live video call. The agent records photographs or screenshots of the workspace, tools and work in progress, which may incidentally show people present. WIEZ uses this evidence only to decide and defend the verification decision, stores it with the Brand's verification records under the same access controls as other KYC records, and keeps it for as long as those records are kept. Video calls take place on a third-party meeting service whose link the agent provides; WIEZ does not record the call's audio or video — only the screenshots the agent saves as evidence.
 
 ---
 
@@ -341,7 +344,7 @@ If you have questions, data portability requests, or privacy compliance inquirie
 
 ### Subscription custom-order policy scope and consumer rights
 
-The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.23-v1.6`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
+The subscription queue rules in this document apply to new custom-order queue purchases and subscription agreements shown and accepted under version `2026.10.23-v1.6` or later; the free plan and the plan-ending notices described here apply from version `2026.11.11-v1.7`. Existing orders retain their recorded policy and payment snapshots; ready-to-wear rules are unchanged. Required notice of material changes remains applicable. Nothing here waives mandatory consumer rights, statutory refunds or access to the competent regulator or courts. Where mandatory law requires a different refund, that right prevails. [FCCPC consumer rights](https://fccpc.gov.ng/consumers/consumer-rights-responsibilities/rights-responsibilities/) explains cancellation rights and reasonable charges.
 
 ## Custom-order queue and subscription records
 

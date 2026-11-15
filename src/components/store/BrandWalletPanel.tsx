@@ -1,3 +1,4 @@
+import { SettingsSectionHeading } from '@/components/settings/SettingsSectionHeading';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -157,10 +158,10 @@ const BrandWalletPanel: React.FC = () => {
   }, [wallet]);
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-4" data-settings-section>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Brand wallet</h2>
+          <SettingsSectionHeading className="text-lg font-semibold text-gray-900 dark:text-white">Brand wallet</SettingsSectionHeading>
           <p className="text-sm text-gray-600 dark:text-gray-300">
             Track available balance, escrow holds, and recent payout outcomes.
           </p>
@@ -211,9 +212,9 @@ const BrandWalletPanel: React.FC = () => {
         ))}
       </div>
 
-      <div className={cardClassName}>
+      <div data-settings-section className={cardClassName}>
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Recent payouts</h3>
+          <SettingsSectionHeading as="h3" className="text-sm font-semibold text-gray-900 dark:text-white">Recent payouts</SettingsSectionHeading>
           <span className="text-xs text-gray-500 dark:text-gray-400">
             Pending: {wallet?.summary.pendingPayoutCount ?? 0}
           </span>

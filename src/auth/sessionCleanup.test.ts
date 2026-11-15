@@ -49,6 +49,8 @@ describe('clearWebPrivateSessionState', () => {
     client.setQueryData(['notifications', 'unreadCount'], { count: 4 });
     client.setQueryData(['messaging', 'unreadCount'], { unreadCount: 2 });
     client.setQueryData(['store', 'cart', 'previous-user'], { items: ['private-cart'] });
+    client.setQueryData(['verification', 'wizard', 'previous-user', 'brand-1'], { draft: { ownerNin: 'private-evidence' } });
+    client.setQueryData(['store', 'general-settings', 'previous-user', 'brand-1'], { contactEmail: 'private@example.invalid' });
     client.setQueryData(['saved', 'batch', 'previous-user', 'PRODUCT', ['product-1']], { isSaved: true });
     client.setQueryData(['media', 'signedUrl', 'private-file'], 'https://signed.example/private');
     client.setQueryData(['config', 'uploadLimits'], { maxBytes: 1_000_000 });
@@ -71,6 +73,8 @@ describe('clearWebPrivateSessionState', () => {
     expect(client.getQueryData(['notifications', 'unreadCount'])).toBeUndefined();
     expect(client.getQueryData(['messaging', 'unreadCount'])).toBeUndefined();
     expect(client.getQueryData(['store', 'cart', 'previous-user'])).toBeUndefined();
+    expect(client.getQueryData(['verification', 'wizard', 'previous-user', 'brand-1'])).toBeUndefined();
+    expect(client.getQueryData(['store', 'general-settings', 'previous-user', 'brand-1'])).toBeUndefined();
     expect(client.getQueryData(['saved', 'batch', 'previous-user', 'PRODUCT', ['product-1']])).toBeUndefined();
     expect(client.getQueryData(['media', 'signedUrl', 'private-file'])).toBeUndefined();
     expect(client.getQueryData(['config', 'uploadLimits'])).toEqual({ maxBytes: 1_000_000 });

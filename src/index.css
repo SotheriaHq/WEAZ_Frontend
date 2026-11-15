@@ -316,7 +316,7 @@ html {
     --wiez-action-primary-text: #ffffff;
     --wiez-action-brand: #9333ea;
     --wiez-action-brand-hover: #7e22ce;
-    --wiez-action-brand-pressed: #6b21a8;
+    --wiez-action-brand-pressed: #af87f4;
     --wiez-action-secondary: #eff0ed;
     --wiez-action-secondary-text: #252824;
     --wiez-action-danger: #ef4444;
@@ -596,7 +596,7 @@ html {
     --wiez-action-primary-text: #0a0a0a;
     --wiez-action-brand: #9333ea;
     --wiez-action-brand-hover: #c084fc;
-    --wiez-action-brand-pressed: #7e22ce;
+    --wiez-action-brand-pressed: #af87f4;
     --wiez-action-secondary: #171e29;
     --wiez-action-secondary-text: #e2e8f0;
     --wiez-action-danger: #ef4444;
@@ -4130,4 +4130,18 @@ html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidd
       background-image: none;
     }
   }
+}
+
+/* Only Settings section containers lose decoration. Inputs and selectable controls retain it. */
+.wiez-settings-screen [data-settings-section] {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+.wiez-settings-screen [data-settings-section]:not([data-settings-highlighted="true"]) {
+  box-shadow: none !important;
+}
+.wiez-settings-screen [data-settings-section].divide-y > :not([hidden]) ~ :not([hidden]) {
+  border-top-width: 0;
+  border-bottom-width: 0;
 }

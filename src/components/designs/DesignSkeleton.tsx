@@ -4,13 +4,10 @@ interface DesignSkeletonProps {
   count?: number;
 }
 
-const DesignSkeleton: React.FC<DesignSkeletonProps> = ({ count = 8 }) => {
-  // Use aspect ratios to simulate varied card heights like real images would
-  const getRandomAspectRatio = () => {
-    const ratios = ['3/4', '4/5', '2/3', '9/16', '1/1'];
-    return ratios[Math.floor(Math.random() * ratios.length)];
-  };
+// Stable slots preserve varied placeholders without moving cards on every rerender.
+const SKELETON_ASPECT_RATIOS = ['3/4', '4/5', '2/3', '9/16', '1/1'] as const;
 
+const DesignSkeleton: React.FC<DesignSkeletonProps> = ({ count = 8 }) => {
   return (
     <>
       {Array.from({ length: count }).map((_, index) => (
@@ -21,7 +18,7 @@ const DesignSkeleton: React.FC<DesignSkeletonProps> = ({ count = 8 }) => {
           {/* Image area skeleton using aspect-ratio to match real card behavior */}
           <div 
             className="relative w-full animate-pulse bg-gradient-to-br from-purple-200/40 via-purple-100/30 to-white/30 dark:from-purple-900/30 dark:via-purple-900/10 dark:to-gray-900/30"
-            style={{ aspectRatio: getRandomAspectRatio() }}
+            style={{ aspectRatio: SKELETON_ASPECT_RATIOS[index % SKELETON_ASPECT_RATIOS.length] }}
           />
           
           {/* Gradient Overlay */}

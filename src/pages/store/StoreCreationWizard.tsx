@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { showNotice } from '@/components/ui/NoticeModal';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
+import { getActiveBrandId } from '@/lib/brandAccess';
 
 // Step Components
 import StoreSocialStep from '@/components/store/wizard/StoreSocialStep';
@@ -196,6 +197,7 @@ const restoreWizardStep = (localDraft: Record<string, unknown> | null): WizardSt
 const StoreCreationWizard: React.FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.user.profile);
+  const activeBrandId = getActiveBrandId(user);
   
   // Current step state
   const [currentStep, setCurrentStep] = useState<WizardStep>('social');
@@ -352,7 +354,7 @@ const StoreCreationWizard: React.FC = () => {
 
       // 1) Server store status - only override server-synced fields
       try {
-        const response = await getStoreStatus();
+        const response = await getStoreStatus({ expectedBrandId: activeBrandId });
         if (!isCancelled) {
           // Redirect away once the setup FLOW is complete — independent of whether
           // the store is currently open or paused. Completed brands never re-enter setup.
@@ -495,7 +497,7 @@ const StoreCreationWizard: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [user]);
+  }, [user, activeBrandId]);
 
   // Redirect if the brand has already completed store setup — they must never be
   // shown / routed back into the setup wizard.
@@ -617,21 +619,11 @@ const StoreCreationWizard: React.FC = () => {
       );
       await openStore({ legalAcceptances });
 
-      // Publishing changes the answer to "is this store set up?", and TWO
-      // separate caches hold that answer. Priming only the module cache was not
-      // enough: `useStoreSetupStatus` reads `statusQuery.data` FIRST, so the
-      // stale React Query entry — fetched moments earlier, while setup really
-      // was incomplete — outranked the prime and kept winning. That single
-      // stale `false` is what left a live store with every studio link but
-      // Store disabled, and what kept the "Finish setting up your store" nudge
-      // on the catalog after publishing.
-      //
-      // Write the known-good state through first so nothing observes a stale
-      // `false`, then invalidate to reconcile with the server.
-      primeStoreSetupStatusCache(true);
+      // Reconcile the publishing actor/workspace in the shared setup cache.
+      if (user?.id) primeStoreSetupStatusCache(true, user.id, activeBrandId);
       invalidateRequireStoreSetupCache();
       queryClient.setQueryData<StoreStatusResponse | undefined>(
-        queryKeys.store.status(),
+        queryKeys.store.status(user?.id, activeBrandId),
         (previous) =>
           previous
             ? {
@@ -705,7 +697,7 @@ const StoreCreationWizard: React.FC = () => {
       }
       setSaveState('error');
     }
-  }, [persistProgress, navigate, user?.id, queryClient]);
+  }, [persistProgress, navigate, user, activeBrandId, queryClient]);
 
   // --- RENDER ---
   return (
