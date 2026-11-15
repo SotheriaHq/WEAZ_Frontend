@@ -98,9 +98,9 @@ describe('Wave 4A Product Detail Vertical Slice (ProductDetailModal)', () => {
     const mainBagBtn = bagButtons[0];
     expect(mainBagBtn).toBeDisabled();
 
-    // Canonical button contains WIEZ action-brand tokens and active tactile inset depth
+    // Canonical button contains WIEZ action-brand tokens without dark press shadow
     expect(mainBagBtn.className).toContain('var(--wiez-action-brand)');
-    expect(mainBagBtn.className).toContain('active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]');
+    expect(mainBagBtn.className).not.toContain('active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]');
 
     // Contains BagPulseIcon
     const pulseIcons = screen.getAllByTestId('bag-pulse-icon');
