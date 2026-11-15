@@ -82,7 +82,7 @@ describe('Atomic UI Components — Wave 2 Migration', () => {
       expect(screen.getByText('Email Address')).toBeDefined();
       expect(screen.getByText('*')).toBeDefined();
       const input = screen.getByPlaceholderText('you@example.com');
-      expect(input.className).toContain('var(--wiez-surface-page)');
+      expect(input.className).toContain('var(--surface-primary)');
       expect(input.className).toContain('var(--wiez-text-primary)');
     });
 
@@ -103,7 +103,7 @@ describe('Atomic UI Components — Wave 2 Migration', () => {
       render(<Textarea label="Order Notes" placeholder="Special delivery instructions" />);
       expect(screen.getByText('Order Notes')).toBeDefined();
       const textarea = screen.getByPlaceholderText('Special delivery instructions');
-      expect(textarea.className).toContain('var(--wiez-surface-page)');
+      expect(textarea.className).toContain('var(--surface-primary)');
       expect(textarea.className).toContain('var(--wiez-text-primary)');
     });
   });
