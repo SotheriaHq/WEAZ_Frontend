@@ -238,7 +238,7 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
             <div
               key={tip.text}
               style={{ animationDelay: `${0.2 + index * 0.1}s` }}
-              className="runway-state-tip surface-control flex items-center gap-2 rounded-full px-4 py-2 shadow-sm"
+              className="runway-state-tip wiez-lg-surface wiez-lg-subtle wiez-lg-borderless flex items-center gap-2 rounded-full px-4 py-2"
             >
               <span>{tip.icon}</span>
               <span className="text-sm text-theme-secondary">{tip.text}</span>
@@ -252,7 +252,7 @@ const StateDisplay: React.FC<StateDisplayProps> = ({ type, category, onRetry, on
             <button
               type="button"
               onClick={onRetry}
-              className="flex items-center gap-2 px-6 py-3 rounded-full bg-[color:var(--text-primary)] text-[color:var(--surface-primary)] font-semibold opacity-95 transition-all hover:opacity-85 shadow-lg active:scale-95"
+              className="wiez-lg-surface wiez-lg-regular wiez-lg-borderless wiez-lg-interactive wiez-lg-tone-ink flex items-center gap-2 px-6 py-3 rounded-full font-semibold active:scale-95"
             >
               <RefreshCcw className="w-5 h-5" />
               Try Again
@@ -864,7 +864,7 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
   };
 
   const categoryChips = (
-    <div className="flex items-center gap-2 border-b border-[color:var(--border-default)]/70 pb-1 text-sm min-w-max justify-start md:justify-center md:mx-auto">
+    <div className="flex items-center gap-2 pb-1 text-sm min-w-max justify-start md:justify-center md:mx-auto">
       {feedCategories.map((cat) => {
         const active = activeCategory === cat.key;
         return (
@@ -875,8 +875,8 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
             aria-pressed={active}
             className={`relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-95 ${
               active
-                ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-active wiez-lg-interactive font-bold'
-                : 'text-theme-secondary hover:bg-[color:var(--surface-muted)] hover:text-theme'
+                ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-borderless wiez-lg-interactive wiez-lg-tone-brand-soft font-bold'
+                : 'wiez-lg-surface wiez-lg-subtle wiez-lg-borderless wiez-lg-interactive wiez-lg-tone-ghost text-theme-secondary'
             }`}
           >
             {cat.label}
@@ -952,8 +952,8 @@ const Runway: React.FC<RunwayProps> = ({ mode = 'designs' }) => {
                 aria-pressed={active}
                 className={`relative shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 ${
                   active
-                    ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-active font-bold'
-                    : 'text-white/75 hover:bg-white/10 hover:text-white'
+                    ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-active wiez-lg-borderless font-bold'
+                    : 'wiez-lg-surface wiez-lg-subtle wiez-lg-stage wiez-lg-borderless text-white/85'
                 }`}
               >
                 {cat.label}

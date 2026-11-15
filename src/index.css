@@ -1202,10 +1202,9 @@ html {
     background-image: var(--wiez-lg-sheen);
     backdrop-filter: blur(var(--wiez-lg-blur-regular)) saturate(var(--wiez-lg-sat-regular)) brightness(102%);
     -webkit-backdrop-filter: blur(var(--wiez-lg-blur-regular)) saturate(var(--wiez-lg-sat-regular)) brightness(102%);
-    border-bottom: 1px solid var(--wiez-lg-border);
-    box-shadow:
-      inset 0 1px 0 var(--wiez-lg-specular-top),
-      inset 0 -1px 0 var(--wiez-lg-specular-bottom);
+    /* No bottom border or bottom hairline: the bar separates by its glass, never by a rule. */
+    border-bottom: 0;
+    box-shadow: inset 0 1px 0 var(--wiez-lg-specular-top);
     transition: box-shadow 0.25s ease, background-color 0.25s ease, border-color 0.25s ease;
   }
 
@@ -1215,31 +1214,27 @@ html {
     background-image: var(--wiez-lg-sheen);
     backdrop-filter: blur(var(--wiez-lg-blur-prominent)) saturate(var(--wiez-lg-sat-prominent)) brightness(103%);
     -webkit-backdrop-filter: blur(var(--wiez-lg-blur-prominent)) saturate(var(--wiez-lg-sat-prominent)) brightness(103%);
-    border-bottom: 1px solid var(--wiez-lg-border);
+    border-bottom: 0;
     box-shadow:
       inset 0 1px 0 var(--wiez-lg-specular-top),
-      inset 0 -1px 0 var(--wiez-lg-specular-bottom),
-      0 6px 24px -4px rgba(15, 23, 42, 0.08);
+      0 10px 30px -14px rgba(15, 23, 42, 0.10);
     transition: box-shadow 0.25s ease, background-color 0.25s ease, border-color 0.25s ease;
   }
 
   :is(.dark) .wiez-liquid-glass,
   :is(.dark) .wiez-nav-surface {
     background-color: var(--wiez-lg-nav-bg);
-    border-bottom-color: var(--wiez-lg-border);
-    box-shadow:
-      inset 0 1px 0 var(--wiez-lg-specular-top),
-      inset 0 -1px 0 var(--wiez-lg-specular-bottom);
+    border-bottom: 0;
+    box-shadow: inset 0 1px 0 var(--wiez-lg-specular-top);
   }
 
   :is(.dark) .wiez-liquid-glass.scrolled,
   :is(.dark) .wiez-nav-surface-muted {
     background-color: var(--wiez-lg-nav-scrolled-bg);
-    border-bottom-color: var(--wiez-lg-border);
+    border-bottom: 0;
     box-shadow:
       inset 0 1px 0 var(--wiez-lg-specular-top),
-      inset 0 -1px 0 var(--wiez-lg-specular-bottom),
-      0 8px 28px -4px rgba(0, 0, 0, 0.55);
+      0 12px 32px -14px rgba(0, 0, 0, 0.40);
   }
 
   /* Canonical Liquid Glass Primitive Classes (v4 optical baseline) */

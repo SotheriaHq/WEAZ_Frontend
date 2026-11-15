@@ -47,7 +47,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
           disabled
             ? 'cursor-not-allowed opacity-50'
             : isSelected
-            ? 'bg-[linear-gradient(180deg,rgba(217,70,239,0.12),rgba(255,255,255,0.1))] dark:bg-[linear-gradient(180deg,rgba(168,85,247,0.18),rgba(255,255,255,0.05))] neu-pressed-button'
+            ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-borderless wiez-lg-tone-brand-soft'
             : 'hover:bg-white/[0.28] dark:hover:bg-white/[0.06]'
         }`}
         title={
@@ -93,7 +93,7 @@ const SidebarLink: React.FC<SidebarLinkProps> = ({
         disabled
           ? 'cursor-not-allowed opacity-50'
           : isSelected
-          ? 'bg-[linear-gradient(90deg,rgba(217,70,239,0.12),rgba(255,255,255,0.12))] font-semibold text-gray-900 dark:bg-[linear-gradient(90deg,rgba(168,85,247,0.18),rgba(255,255,255,0.04))] dark:text-white neu-pressed-button'
+          ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-borderless wiez-lg-tone-brand-soft font-semibold'
           : 'text-gray-700 dark:text-gray-300 hover:bg-white/[0.28] dark:hover:bg-white/5'
       }`}
       title={disabled ? `${label} (locked until store setup is complete)` : isRail ? label : undefined}
@@ -351,7 +351,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ overlayOnly = false }) => {
           isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0 pointer-events-none'
         }`}
       >
-        <div className="h-16 shrink-0 border-b border-gray-200/50 px-4 sm:px-5 dark:border-white/10 flex items-center justify-start">
+        <div className="h-16 shrink-0 px-4 sm:px-5 flex items-center justify-start">
           <button
             onClick={() => dispatch(toggleSidebar())}
             className="inline-flex h-9 w-9 items-center justify-center mr-1 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 transition-colors"
