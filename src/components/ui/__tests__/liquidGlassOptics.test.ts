@@ -27,12 +27,22 @@ describe('Strong Lens spec', () => {
         fresnelGain: 0.7,
         specGain: 0.35,
         shininess: 30,
-        rimDp: 1.1,
-        shadeGain: 0.08,
         saturation: 1.15,
         bezelMaxDp: 36,
       },
     });
+  });
+
+  it('is borderless: no rim filament or edge shade terms', () => {
+    expect(LIQUID_GLASS_LENS.lens).not.toHaveProperty('rimDp');
+    expect(LIQUID_GLASS_LENS.lens).not.toHaveProperty('shadeGain');
+    const o = resolveLensOptics(SHAPES.chip);
+    const edge = sampleLens(0, -o.hy + 0.25, o);
+    expect(edge).not.toHaveProperty('shade');
+    // The outermost pixel is no brighter than a pixel slightly inside it:
+    // there is no bright outline drawn along the edge.
+    const inside = sampleLens(0, -o.hy + 1.5, o);
+    expect(edge?.highlight ?? 0).toBeLessThanOrEqual((inside?.highlight ?? 0) + 0.25);
   });
 });
 

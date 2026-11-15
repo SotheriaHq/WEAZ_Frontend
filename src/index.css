@@ -529,10 +529,15 @@ html {
       rgba(255, 255, 255, 0.08) 46%,
       rgba(255, 255, 255, 0.22) 100%
     );
-    --wiez-lg-border: rgba(20, 20, 24, 0.10);
-    --wiez-lg-border-hover: rgba(147, 51, 234, 0.26);
-    --wiez-lg-specular-top: rgba(255, 255, 255, 0.94);
-    --wiez-lg-specular-bottom: rgba(20, 20, 24, 0.06);
+    /*
+     * Borderless glass (owner, 15 Nov 2026): like the system media island, no
+     * glass draws an edge line or a 1px white rim. These edge tokens stay so the
+     * 1px border box (layout) is unchanged; they are simply invisible.
+     */
+    --wiez-lg-border: transparent;
+    --wiez-lg-border-hover: transparent;
+    --wiez-lg-specular-top: transparent;
+    --wiez-lg-specular-bottom: transparent;
     --wiez-lg-shadow: 0 8px 28px -6px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.04);
     --wiez-lg-shadow-hover: 0 12px 32px -6px rgba(124, 58, 237, 0.16), 0 4px 12px rgba(15, 23, 42, 0.06);
     --wiez-lg-shadow-elevated: 0 20px 48px -8px rgba(15, 23, 42, 0.14), 0 4px 14px rgba(15, 23, 42, 0.06);
@@ -541,7 +546,7 @@ html {
       rgba(168, 85, 247, 0.24) 0%,
       rgba(147, 51, 234, 0.10) 100%
     );
-    --wiez-lg-active-border: rgba(168, 85, 247, 0.44);
+    --wiez-lg-active-border: transparent;
     --wiez-lg-active-text: #6b21a8;
     --wiez-lg-active-shadow: 0 4px 14px -2px rgba(147, 51, 234, 0.34);
     --wiez-lg-focus-ring: 0 0 0 2px rgba(255, 255, 255, 0.95), 0 0 0 4px rgba(147, 51, 234, 0.72);
@@ -549,9 +554,9 @@ html {
     --wiez-lg-reduced-bg: rgba(255, 255, 255, 0.97);
     --wiez-lg-stage-tint: rgba(16, 16, 20, 0.34);
     --wiez-lg-stage-hover-tint: rgba(24, 24, 32, 0.50);
-    --wiez-lg-stage-border: rgba(255, 255, 255, 0.24);
-    --wiez-lg-stage-specular-top: rgba(255, 255, 255, 0.42);
-    --wiez-lg-stage-specular-bottom: rgba(255, 255, 255, 0.10);
+    --wiez-lg-stage-border: transparent;
+    --wiez-lg-stage-specular-top: transparent;
+    --wiez-lg-stage-specular-bottom: transparent;
     --wiez-lg-stage-sheen: linear-gradient(
       148deg,
       rgba(255, 255, 255, 0.18) 0%,
@@ -748,10 +753,10 @@ html {
       rgba(255, 255, 255, 0.02) 48%,
       rgba(255, 255, 255, 0.06) 100%
     );
-    --wiez-lg-border: rgba(255, 255, 255, 0.14);
-    --wiez-lg-border-hover: rgba(192, 132, 252, 0.34);
-    --wiez-lg-specular-top: rgba(255, 255, 255, 0.28);
-    --wiez-lg-specular-bottom: rgba(0, 0, 0, 0.36);
+    --wiez-lg-border: transparent;
+    --wiez-lg-border-hover: transparent;
+    --wiez-lg-specular-top: transparent;
+    --wiez-lg-specular-bottom: transparent;
     --wiez-lg-shadow: 0 10px 30px -6px rgba(0, 0, 0, 0.58), 0 2px 8px rgba(0, 0, 0, 0.32);
     --wiez-lg-shadow-hover: 0 14px 36px -6px rgba(0, 0, 0, 0.70), 0 4px 12px rgba(168, 85, 247, 0.18);
     --wiez-lg-shadow-elevated: 0 24px 56px -8px rgba(0, 0, 0, 0.72), 0 4px 16px rgba(0, 0, 0, 0.42);
@@ -760,7 +765,7 @@ html {
       rgba(192, 132, 252, 0.30) 0%,
       rgba(168, 85, 247, 0.14) 100%
     );
-    --wiez-lg-active-border: rgba(216, 180, 254, 0.42);
+    --wiez-lg-active-border: transparent;
     --wiez-lg-active-text: #f3e8ff;
     --wiez-lg-active-shadow: 0 4px 16px -2px rgba(168, 85, 247, 0.50);
     --wiez-lg-focus-ring: 0 0 0 2px rgba(18, 16, 28, 0.96), 0 0 0 4px rgba(192, 132, 252, 0.85);
@@ -1289,9 +1294,9 @@ html {
     --wiez-lg-local-bg: rgba(255, 255, 255, 0.54);
     --wiez-lg-local-hover-bg: rgba(255, 255, 255, 0.72);
     --wiez-lg-local-sheen: linear-gradient(148deg, rgba(255, 255, 255, 0.54) 0%, rgba(255, 255, 255, 0.08) 46%, rgba(255, 255, 255, 0.22) 100%);
-    --wiez-lg-local-border: rgba(20, 20, 24, 0.10);
-    --wiez-lg-local-spec-top: rgba(255, 255, 255, 0.94);
-    --wiez-lg-local-spec-bottom: rgba(20, 20, 24, 0.06);
+    --wiez-lg-local-border: transparent;
+    --wiez-lg-local-spec-top: transparent;
+    --wiez-lg-local-spec-bottom: transparent;
     --wiez-lg-local-shadow: 0 8px 28px -6px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.04);
     color: #141416;
   }
@@ -1300,9 +1305,9 @@ html {
     --wiez-lg-local-bg: rgba(20, 20, 24, 0.58);
     --wiez-lg-local-hover-bg: rgba(32, 30, 42, 0.72);
     --wiez-lg-local-sheen: linear-gradient(148deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.02) 48%, rgba(255, 255, 255, 0.06) 100%);
-    --wiez-lg-local-border: rgba(255, 255, 255, 0.14);
-    --wiez-lg-local-spec-top: rgba(255, 255, 255, 0.28);
-    --wiez-lg-local-spec-bottom: rgba(0, 0, 0, 0.36);
+    --wiez-lg-local-border: transparent;
+    --wiez-lg-local-spec-top: transparent;
+    --wiez-lg-local-spec-bottom: transparent;
     --wiez-lg-local-shadow: 0 10px 30px -6px rgba(0, 0, 0, 0.58), 0 2px 8px rgba(0, 0, 0, 0.32);
     color: #ffffff;
   }
@@ -1337,11 +1342,8 @@ html {
 
     .wiez-lg-interactive.wiez-lg-stage:hover:not(:disabled):not([aria-disabled='true']) {
       background-color: var(--wiez-lg-stage-hover-tint);
-      border-color: rgba(255, 255, 255, 0.38);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.55),
-        inset 0 -1px 0 var(--wiez-lg-stage-specular-bottom),
-        0 10px 28px -4px rgba(0, 0, 0, 0.55);
+      border-color: transparent;
+      box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.55);
     }
   }
 
@@ -1358,7 +1360,6 @@ html {
 
   .wiez-lg-interactive.wiez-lg-stage:focus-visible {
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.6),
       0 0 0 2px rgba(255, 255, 255, 0.92),
       0 0 0 4px rgba(168, 85, 247, 0.85);
   }
@@ -1376,11 +1377,9 @@ html {
   .wiez-lg-surface.wiez-lg-stage.wiez-lg-active {
     background-color: rgba(168, 85, 247, 0.34);
     background-image: linear-gradient(150deg, rgba(255, 255, 255, 0.24) 0%, rgba(168, 85, 247, 0.14) 100%);
-    border-color: rgba(233, 213, 255, 0.62);
+    border-color: transparent;
     color: #ffffff;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.45),
-      0 4px 16px -2px rgba(168, 85, 247, 0.50);
+    box-shadow: 0 4px 16px -2px rgba(168, 85, 247, 0.50);
   }
 
   .wiez-lg-borderless {
@@ -1390,7 +1389,7 @@ html {
   /*
    * Strong Lens. `LiquidGlassLensLayer` sets `data-lg-lens="on"`, an inline
    * `backdrop-filter: url(#wiez-lens-…)` (SVG displacement of the live page)
-   * and `--wiez-lg-material` (geometry-derived Fresnel, specular and edge shade)
+   * and `--wiez-lg-material` (geometry-derived Fresnel and specular, no edge line)
    * on control-sized surfaces in Chromium. Everything else keeps the frosted
    * material above. Geometry replaces the decorative border, sheen and inset
    * highlight lines; the tint drops to the lens tint.

@@ -14,8 +14,11 @@
  *   sampled inward along the normal by S·(1 − t)^k, plus a slight pull toward
  *   the medial axis (magnification). S is hard-clamped so the sampling map can
  *   never fold (local derivative ≥ 0.15).
- * - Reflection: the normal is lifted to 3D with a rim tilt; Schlick Fresnel, a
+ * - Reflection: the normal is lifted to 3D with a bezel tilt; Schlick Fresnel, a
  *   key-light specular lobe and a weaker exit caustic follow the real curvature.
+ * - Borderless (owner, 15 Nov 2026), like the system media island: no rim
+ *   filament and no darkened edge ring. The edge reads only through Fresnel
+ *   falloff and refraction.
  */
 export const LIQUID_GLASS_LENS = {
   /** Fraction of the short half-axis that is curved (1 = full dome). */
@@ -34,8 +37,6 @@ export const LIQUID_GLASS_LENS = {
     fresnelGain: 0.7,
     specGain: 0.35,
     shininess: 30,
-    rimDp: 1.1,
-    shadeGain: 0.08,
     saturation: 1.15,
     bezelMaxDp: 36,
   },
@@ -52,8 +53,6 @@ export const LIQUID_GLASS_LENS = {
 /** Key light direction in screen space (y down): top-left. Same as the AGSL shader. */
 const LIGHT_X = -0.616;
 const LIGHT_Y = -0.788;
-/** Neutral charcoal used for the inboard edge shade (same as the AGSL shader). */
-const SHADE_RGB = [14, 14, 16] as const;
 
 export interface LensShape {
   w: number;
@@ -73,8 +72,6 @@ export interface LensOptics {
   maxTilt: number;
   fresnel: number;
   spec: number;
-  rimGain: number;
-  shade: number;
   h1: readonly [number, number, number];
   h2: readonly [number, number, number];
 }
@@ -121,8 +118,6 @@ export function resolveLensOptics(shape: LensShape, spec = LIQUID_GLASS_LENS): L
     maxTilt: ((lens.maxTiltDeg * Math.PI) / 180) * mix(0.75, 1.1, thickness),
     fresnel: lens.fresnelGain * spec.reflectionStrength,
     spec: lens.specGain * spec.reflectionStrength,
-    rimGain: (lens.fresnelGain * spec.reflectionStrength) / 0.9,
-    shade: lens.shadeGain * mix(0.7, 1.3, thickness),
     h1: H1,
     h2: H2,
   };
@@ -138,21 +133,17 @@ export interface LensSample {
   /** Backdrop sample offset (CSS px) relative to this pixel. */
   ox: number;
   oy: number;
-  /** White highlight alpha (Fresnel + specular + rim). */
+  /** White highlight alpha (Fresnel + specular). */
   highlight: number;
-  /** Neutral inboard edge shade alpha. */
-  shade: number;
 }
 
 /**
  * Evaluates the lens at a point relative to the shape centre. With
- * `extendEdge`, points outside the shape return the rim displacement so the
- * filtered displacement map never blends a full rim shift with "no shift".
+ * `extendEdge`, points outside the shape return the edge displacement so the
+ * filtered displacement map never blends a full edge shift with "no shift".
  */
 export function sampleLens(px: number, py: number, o: LensOptics, extendEdge = false): LensSample | null {
-  const sdReal = sdRoundRect(px, py, o.hx, o.hy, o.r);
-  if (sdReal > 0 && !extendEdge) return null;
-  const inwardReal = Math.max(0, -sdReal);
+  if (sdRoundRect(px, py, o.hx, o.hy, o.r) > 0 && !extendEdge) return null;
 
   const qx = Math.abs(px) - (o.hx - o.r2);
   const qy = Math.abs(py) - (o.hy - o.r2);
@@ -186,18 +177,11 @@ export function sampleLens(px: number, py: number, o: LensOptics, extendEdge = f
   const d1 = Math.max(0, n3x * o.h1[0] + n3y * o.h1[1] + ct * o.h1[2]);
   const d2 = Math.max(0, n3x * o.h2[0] + n3y * o.h2[1] + ct * o.h2[2]);
   const spec = (Math.pow(d1, shininess) + Math.pow(d2, shininess * 1.3) * 0.38) * o.spec;
-  const facing = nx * LIGHT_X + ny * LIGHT_Y;
-  const rimT = clamp(1 - inwardReal / LIQUID_GLASS_LENS.lens.rimDp, 0, 1);
-  const rim =
-    Math.pow(rimT, 1.6) *
-    (0.1 + 0.65 * Math.pow(Math.max(facing, 0), 2) + 0.3 * Math.pow(Math.max(-facing, 0), 3)) *
-    o.rimGain;
 
   return {
     ox,
     oy,
-    highlight: clamp(fres * o.fresnel * 0.9 + spec + rim, 0, 0.95),
-    shade: clamp(Math.exp(-inwardReal / 2.4) * (0.45 + 0.55 * Math.max(-facing, 0)) * o.shade, 0, 0.3),
+    highlight: clamp(fres * o.fresnel * 0.9 + spec, 0, 0.95),
   };
 }
 
@@ -206,7 +190,7 @@ export interface LensMaps {
   displacement: string;
   /** feDisplacementMap `scale` matching the map encoding. */
   scale: number;
-  /** RGBA highlight + shade overlay at device resolution. */
+  /** RGBA white highlight overlay at device resolution. */
   material: string;
 }
 
@@ -252,16 +236,12 @@ export function buildLensMaps(shape: LensShape, devicePixelRatio = 1): LensMaps 
   for (let y = 0; y < h * dpr; y++) {
     for (let x = 0; x < w * dpr; x++) {
       const sample = sampleLens((x + 0.5) / dpr - o.hx, (y + 0.5) / dpr - o.hy, o);
-      if (!sample) continue;
-      // Neutral shade under a white highlight, non-premultiplied "over".
-      const shadeA = sample.shade * (1 - sample.highlight);
-      const a = sample.highlight + shadeA;
-      if (a <= 0) continue;
+      if (!sample || sample.highlight <= 0) continue;
       const i = (y * w * dpr + x) * 4;
-      for (let c = 0; c < 3; c++) {
-        mat.data[i + c] = (255 * sample.highlight + SHADE_RGB[c] * shadeA) / a;
-      }
-      mat.data[i + 3] = Math.round(clamp(a, 0, 1) * 255);
+      mat.data[i] = 255;
+      mat.data[i + 1] = 255;
+      mat.data[i + 2] = 255;
+      mat.data[i + 3] = Math.round(clamp(sample.highlight, 0, 1) * 255);
     }
   }
   matCtx.putImageData(mat, 0, 0);

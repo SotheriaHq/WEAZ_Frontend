@@ -5,8 +5,8 @@ import { buildLensMaps, LIQUID_GLASS_LENS, type LensShape } from './liquidGlassO
  *
  * Control-sized, rounded surfaces (island, circular controls, buttons, chips)
  * get an inline `backdrop-filter: url(#wiez-lens-…)` whose SVG displacement
- * map refracts the live page behind them, plus `--wiez-lg-material` (Fresnel,
- * specular, edge shade) and `data-lg-lens="on"` for the CSS lens rules. One
+ * map refracts the live page behind them, plus `--wiez-lg-material` (Fresnel
+ * and specular highlights only; no edge line) and `data-lg-lens="on"` for the CSS lens rules. One
  * filter is shared by every surface of the same geometry.
  *
  * Left on the frosted material: panels and bars (larger than
