@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { useLocation } from 'react-router-dom';
 
 import CountBadge from '@/components/navigation/CountBadge';
+import { buildLensMaps } from '@/components/ui/liquidGlassOptics';
 
 export type IslandBottomNavItem = {
   key: string;
@@ -306,8 +307,70 @@ const ITEM_BASE_CLASS =
  * behind `(hover: hover)` so a finger can never trigger it, the highlight is
  * off, and this is what is left.
  */
-const ITEM_SELECTED_CLASS =
-  'wiez-lg-surface wiez-lg-subtle wiez-lg-active wiez-lg-borderless';
+// The selected item no longer draws its own pill (that read as the selection
+// jumping). One shared `IslandGlide` droplet slides under it instead; the item
+// keeps only the active ink.
+const ITEM_SELECTED_CLASS = 'text-[color:var(--wiez-lg-active-text)]';
+
+const MORE_GLIDE_KEY = '__island_more__';
+
+type GlideFrame = { x: number; y: number; w: number; h: number };
+
+/**
+ * The island's active indicator: ONE brand-tinted Strong Lens droplet that
+ * glides to the pressed/active item (it follows `optimisticActiveKey`, which is
+ * set at pointer-down) with a slightly springy transform/width transition.
+ * Nested inside the island glass it cannot refract the page, so it carries the
+ * Strong Lens material map instead: system colour inside, glass highlights on
+ * top.
+ */
+function IslandGlide({
+  targetKey,
+  itemRefs,
+  rowWidth,
+}: {
+  targetKey: string | null;
+  itemRefs: React.MutableRefObject<Map<string, HTMLButtonElement>>;
+  rowWidth: number;
+}) {
+  const [frame, setFrame] = useState<GlideFrame | null>(null);
+  useLayoutEffect(() => {
+    const el = targetKey ? itemRefs.current.get(targetKey) : undefined;
+    if (!el) {
+      setFrame(null);
+      return;
+    }
+    const next = { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
+    setFrame((prev) =>
+      prev && prev.x === next.x && prev.y === next.y && prev.w === next.w && prev.h === next.h ? prev : next,
+    );
+    // The glide renders after the items, so their refs exist on first measure;
+    // a resized row (rowWidth) re-measures.
+  }, [targetKey, itemRefs, rowWidth]);
+  const glassW = frame?.w ?? 0;
+  const glassH = frame?.h ?? 0;
+  const material = useMemo(() => {
+    if (glassW < 4 || glassH < 4 || typeof window === 'undefined') return undefined;
+    try {
+      return buildLensMaps({ w: glassW, h: glassH, r: glassH / 2 }, window.devicePixelRatio || 1).material;
+    } catch {
+      return undefined;
+    }
+  }, [glassW, glassH]);
+  return (
+    <span
+      aria-hidden="true"
+      className="island-glide wiez-lg-surface wiez-lg-subtle wiez-lg-borderless wiez-lg-tone-brand-soft pointer-events-none absolute rounded-full"
+      style={{
+        width: glassW,
+        height: glassH,
+        transform: `translate3d(${frame?.x ?? 0}px, ${frame?.y ?? 0}px, 0)`,
+        opacity: frame ? 1 : 0,
+        backgroundImage: material ? `url("${material}")` : undefined,
+      }}
+    />
+  );
+}
 
 const ITEM_IDLE_CLASS =
   'text-theme-secondary ' +
@@ -403,6 +466,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
    * a resized window, and the `maxWidthClassName` cap changing between docks.
    */
   const rowRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef(new Map<string, HTMLButtonElement>());
   const [rowWidth, setRowWidth] = useState(0);
 
   useLayoutEffect(() => {
@@ -562,7 +626,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
             onPointerMove={trackPress}
             onPointerCancel={() => withdrawCandidate(true)}
             onPointerLeave={() => withdrawCandidate(false)}
-            className="flex h-full items-center gap-1"
+            className="relative flex h-full items-center gap-1"
           >
             {visibleItems.map((item) => {
               const visual = item.icon ?? item.emoji;
@@ -572,6 +636,10 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
               return (
                 <button
                   key={item.key}
+                  ref={(node) => {
+                    if (node) itemRefs.current.set(item.key, node);
+                    else itemRefs.current.delete(item.key);
+                  }}
                   type="button"
                   disabled={item.disabled}
                   // Pointer events only: they cover mouse and touch, and the old
@@ -586,6 +654,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
                   title={item.disabled ? `${item.label} is locked` : item.label}
                   className={clsx(
                     ITEM_BASE_CLASS,
+                    'relative z-[1]',
                     item.disabled
                       ? 'cursor-not-allowed text-gray-400 opacity-50 dark:text-gray-600'
                       : isSelected
@@ -606,6 +675,10 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
 
             {overflowItems.length > 0 ? (
               <button
+                ref={(node) => {
+                  if (node) itemRefs.current.set(MORE_GLIDE_KEY, node);
+                  else itemRefs.current.delete(MORE_GLIDE_KEY);
+                }}
                 type="button"
                 onClick={() => setMoreOpen((open) => !open)}
                 aria-expanded={moreOpen}
@@ -615,6 +688,7 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
                 title="More"
                 className={clsx(
                   ITEM_BASE_CLASS,
+                  'relative z-[1]',
                   moreOpen || overflowHasSelection ? ITEM_SELECTED_CLASS : ITEM_IDLE_CLASS,
                 )}
               >
@@ -627,6 +701,17 @@ export const IslandBottomNav: React.FC<IslandBottomNavProps> = ({
                 <span className="max-w-full truncate leading-tight">More</span>
               </button>
             ) : null}
+
+            {/* Rendered after the items so their refs exist when it measures; the
+                items sit above it via z-[1]. */}
+            <IslandGlide
+              targetKey={
+                visibleItems.find((item) => isItemSelected(item))?.key ??
+                (moreOpen || overflowHasSelection ? MORE_GLIDE_KEY : null)
+              }
+              itemRefs={itemRefs}
+              rowWidth={rowWidth}
+            />
           </div>
         </div>
       </nav>

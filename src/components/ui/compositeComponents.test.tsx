@@ -31,10 +31,10 @@ describe('Wave 3 Composite UI Components', () => {
       expect(screen.getByText('Are you sure you want to delete this item?')).toBeInTheDocument();
 
       const cancelBtn = screen.getByRole('button', { name: 'Keep' });
-      expect(cancelBtn).toHaveClass('neu-pressed-button');
+      expect(cancelBtn).toHaveClass('wiez-lg-surface');
 
       const confirmBtn = screen.getByRole('button', { name: 'Delete' });
-      expect(confirmBtn.className).toContain('var(--wiez-action-danger)');
+      expect(confirmBtn).toHaveClass('wiez-lg-tone-danger');
 
       fireEvent.click(cancelBtn);
       expect(onCancel).toHaveBeenCalledTimes(1);
@@ -96,7 +96,7 @@ describe('Wave 3 Composite UI Components', () => {
   });
 
   describe('SegmentChips', () => {
-    it('renders segmented chip options and uses neu-pressed-button for active option', () => {
+    it('renders segmented chip options with a brand-soft glass active option', () => {
       const onChange = vi.fn();
 
       render(
@@ -113,7 +113,7 @@ describe('Wave 3 Composite UI Components', () => {
 
       const activeChip = screen.getByRole('tab', { name: 'Live' });
       expect(activeChip).toHaveAttribute('aria-selected', 'true');
-      expect(activeChip).toHaveClass('neu-pressed-button');
+      expect(activeChip).toHaveClass('wiez-lg-surface', 'wiez-lg-tone-brand-soft');
 
       const draftChip = screen.getByRole('tab', { name: 'Draft' });
       expect(draftChip).toHaveAttribute('aria-selected', 'false');

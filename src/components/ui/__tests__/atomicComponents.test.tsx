@@ -4,45 +4,45 @@ import { Button, Input, Textarea, Card, Badge, Text } from '@/components/ui';
 
 describe('Atomic UI Components — Wave 2 Migration', () => {
   describe('Button', () => {
-    it('renders primary variant with semantic action-primary classes', () => {
+    it('renders primary variant as ink-tinted Strong Lens glass', () => {
       render(<Button variant="primary">Confirm Action</Button>);
       const btn = screen.getByRole('button', { name: /confirm action/i });
       expect(btn).toBeDefined();
-      expect(btn.className).toContain('var(--wiez-action-primary)');
+      expect(btn).toHaveClass('wiez-lg-surface', 'wiez-lg-interactive', 'wiez-lg-tone-ink', 'wiez-lg-borderless');
     });
 
-    it('renders brand variant with semantic action-brand classes', () => {
+    it('renders brand variant as brand-tinted Strong Lens glass', () => {
       render(<Button variant="brand">Add to Bag</Button>);
       const btn = screen.getByRole('button', { name: /add to bag/i });
       expect(btn).toBeDefined();
-      expect(btn.className).toContain('var(--wiez-action-brand)');
-      expect(btn.className).toContain('var(--wiez-action-brand-hover)');
+      expect(btn).toHaveClass('wiez-lg-surface', 'wiez-lg-tone-brand');
     });
 
-    it('renders secondary tactile variant with approved neu-pressed-button', () => {
+    it('renders secondary variant as neutral Strong Lens glass', () => {
       render(<Button variant="secondary">Cancel</Button>);
       const btn = screen.getByRole('button', { name: /cancel/i });
-      expect(btn.className).toContain('neu-pressed-button');
+      expect(btn).toHaveClass('wiez-lg-surface', 'wiez-lg-borderless');
+      expect(btn.className).not.toContain('wiez-lg-tone-');
     });
 
-    it('renders neumorphic compatibility alias as tactile button', () => {
+    it('renders neumorphic compatibility alias as neutral glass', () => {
       render(<Button variant="neumorphic">Save Draft</Button>);
       const btn = screen.getByRole('button', { name: /save draft/i });
-      expect(btn.className).toContain('neu-pressed-button');
+      expect(btn).toHaveClass('wiez-lg-surface', 'wiez-lg-borderless');
     });
 
-    it('renders brand and primary buttons with tactile pressed depth', () => {
+    it('renders brand and primary buttons with a glass press response', () => {
       render(<Button variant="brand">Publish</Button>);
       const btn = screen.getByRole('button', { name: /publish/i });
-      expect(btn.className).toContain('active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]');
+      expect(btn).toHaveClass('wiez-lg-interactive');
       expect(btn.className).toContain('active:scale-[0.98]');
     });
 
-    it('renders outline variant with 2px border and semantic border token', () => {
+    it('renders outline variant as glass that keeps its 2px box', () => {
       render(<Button variant="outline">Learn More</Button>);
       const btn = screen.getByRole('button', { name: /learn more/i });
       expect(btn.className).toContain('border-2');
-      expect(btn.className).toContain('var(--wiez-border-default)');
+      expect(btn).toHaveClass('wiez-lg-surface');
     });
 
     it('handles disabled state and prevents clicks', () => {

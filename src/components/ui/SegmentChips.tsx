@@ -20,7 +20,7 @@ const SegmentChips: React.FC<SegmentChipsProps> = ({ options, value, onChange, c
   const sizes = sizeClasses[size];
   return (
     <div
-      className={`inline-flex items-center rounded-full neu-recessed-card ${sizes.container} ${className}`}
+      className={`inline-flex items-center rounded-full wiez-lg-surface wiez-lg-subtle wiez-lg-borderless ${sizes.container} ${className}`}
       role="tablist"
       aria-label={ariaLabel}
     >
@@ -36,7 +36,7 @@ const SegmentChips: React.FC<SegmentChipsProps> = ({ options, value, onChange, c
             onClick={() => onChange(opt.key)}
             className={`rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--wiez-focus-ring)] ${sizes.chip} ` +
               (selected
-                ? 'neu-pressed-button text-[color:var(--wiez-text-primary)] font-semibold shadow-sm'
+                ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-borderless wiez-lg-tone-brand-soft font-semibold'
                 : 'text-[color:var(--wiez-text-secondary)] hover:text-[color:var(--wiez-text-primary)]')}
           >
             {opt.label}

@@ -18,7 +18,9 @@ interface TagProps {
 export const Tag: React.FC<TagProps> = ({ label, size = 'sm', color = 'purple', leftIcon, rightIcon, iconOnly, className }) => (
   <span
     className={clsx(
-      'inline-flex items-center gap-1 neu-inset-chip select-none whitespace-nowrap',
+      // Strong Lens glass tinted with the tag's own semantic colour (chip-* sets it).
+      'inline-flex items-center gap-1 select-none whitespace-nowrap rounded-full',
+      'wiez-lg-surface wiez-lg-subtle wiez-lg-borderless wiez-lg-tone-current',
       size === 'xs' && 'chip-xs',
       size === 'sm' && 'chip-sm',
       size === 'md' && 'chip-md',

@@ -56,20 +56,29 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
 
   const baseClasses = 'relative inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--wiez-border-focus)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] active:translate-y-[1px]';
 
+  /*
+    Strong Lens glass for every button (owner decision, 15 Nov 2026). Each
+    variant keeps its system colour as the glass tint (ink / brand / danger),
+    supporting actions are neutral glass, ghost is barely-there glass, link
+    stays text. `LiquidGlassLensLayer` refracts them where the browser can.
+    Borderless variants stay borderless and outline keeps its 2px box, so no
+    button changes size.
+  */
+  const GLASS = 'wiez-lg-surface wiez-lg-interactive';
   const variantClasses: Record<NonNullable<ButtonProps['variant']>, string> = {
     // High-contrast neutral action (Save, Continue, Confirm)
-    primary:   'bg-[color:var(--wiez-action-primary)] hover:bg-[color:var(--wiez-action-primary-hover)] text-[color:var(--wiez-action-primary-text)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
+    primary:   `${GLASS} wiez-lg-regular wiez-lg-borderless wiez-lg-tone-ink`,
     // WIEZ interactive accent (Follow, Add to Bag, Subscribe, Publish)
-    brand:     'bg-[color:var(--wiez-action-brand)] hover:bg-[color:var(--wiez-action-brand-hover)] active:bg-[color:var(--wiez-action-brand-pressed)] text-white active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
-    // Tactile secondary supporting action (pure approved .neu-pressed-button)
-    secondary: 'neu-pressed-button',
-    neumorphic: 'neu-pressed-button',
-    // Bordered low/medium emphasis action
-    outline:   'border-2 border-[color:var(--wiez-border-default)] bg-transparent text-[color:var(--wiez-text-primary)] hover:bg-[color:var(--wiez-surface-card)] hover:border-[color:var(--wiez-border-strong)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.20)]',
+    brand:     `${GLASS} wiez-lg-regular wiez-lg-borderless wiez-lg-tone-brand`,
+    // Supporting action
+    secondary: `${GLASS} wiez-lg-regular wiez-lg-borderless`,
+    neumorphic: `${GLASS} wiez-lg-regular wiez-lg-borderless`,
+    // Bordered low/medium emphasis action (border kept for size; glass edge reads instead)
+    outline:   `${GLASS} wiez-lg-regular border-2`,
     // Ghost — minimal action in dense UI
-    ghost:     'bg-transparent text-[color:var(--wiez-text-secondary)] hover:text-[color:var(--wiez-text-primary)] hover:bg-[color:var(--wiez-surface-subtle)]',
+    ghost:     `${GLASS} wiez-lg-subtle wiez-lg-borderless wiez-lg-tone-ghost text-[color:var(--wiez-text-secondary)]`,
     link:      'bg-transparent hover:underline text-[color:var(--wiez-text-primary)] underline-offset-2',
-    danger:    'bg-[color:var(--wiez-action-danger)] hover:opacity-90 active:bg-[color:var(--wiez-action-danger-active)] text-white active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
+    danger:    `${GLASS} wiez-lg-regular wiez-lg-borderless wiez-lg-tone-danger`,
   };
 
   const sizeClasses = {
