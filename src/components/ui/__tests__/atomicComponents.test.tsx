@@ -31,10 +31,11 @@ describe('Atomic UI Components — Wave 2 Migration', () => {
       expect(btn.className).toContain('neu-pressed-button');
     });
 
-    it('renders brand and primary buttons with tactile pressed depth', () => {
+    it('renders brand buttons with pressed brand token and without dark press shadow', () => {
       render(<Button variant="brand">Publish</Button>);
       const btn = screen.getByRole('button', { name: /publish/i });
-      expect(btn.className).toContain('active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]');
+      expect(btn.className).not.toContain('active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]');
+      expect(btn.className).toContain('active:bg-[color:var(--wiez-action-brand-pressed)]');
       expect(btn.className).toContain('active:scale-[0.98]');
     });
 

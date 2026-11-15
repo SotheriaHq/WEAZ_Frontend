@@ -60,7 +60,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({
     // High-contrast neutral action (Save, Continue, Confirm)
     primary:   'bg-[color:var(--wiez-action-primary)] hover:bg-[color:var(--wiez-action-primary-hover)] text-[color:var(--wiez-action-primary-text)] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
     // WIEZ interactive accent (Follow, Add to Bag, Subscribe, Publish)
-    brand:     'bg-[color:var(--wiez-action-brand)] hover:bg-[color:var(--wiez-action-brand-hover)] active:bg-[color:var(--wiez-action-brand-pressed)] text-white active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]',
+    brand:     'bg-[color:var(--wiez-action-brand)] hover:bg-[color:var(--wiez-action-brand-hover)] active:bg-[color:var(--wiez-action-brand-pressed)] text-white',
     // Tactile secondary supporting action (pure approved .neu-pressed-button)
     secondary: 'neu-pressed-button',
     neumorphic: 'neu-pressed-button',
