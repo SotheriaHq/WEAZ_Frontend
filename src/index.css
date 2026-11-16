@@ -4174,3 +4174,110 @@ html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidd
   border-top-width: 0;
   border-bottom-width: 0;
 }
+
+/*
+  Admin glass layer (16 Nov 2026). The admin screens are hand-built with
+  Tailwind recipes (36 solid purple, 169 grey-outlined, ~240 rounded-full chips
+  across 47 files) rather than the shared Button/Tag primitives, so they never
+  picked up the Strong Lens rollout. Scoped to the admin shell
+  (AdminScaffold adds .wiez-admin-glass), this maps each recipe to the same
+  glass material and tones as the rest of the product, matching EXACT class
+  tokens ([class~=...]) so hover-only purples are not mistaken for purple
+  buttons. Borderless like the rest of the glass; widths kept for layout.
+*/
+.wiez-admin-glass :is(button, [role="tab"], a[role="button"]):is(
+    [class~="border"], [class~="bg-white"], [class~="bg-gray-50"], [class~="bg-gray-100"],
+    [class~="bg-white/5"], [class~="bg-white/10"], [class~="neu-pressed-button"]
+  ) {
+  --wiez-admin-glass-bg: var(--wiez-lg-tint-regular);
+  --wiez-admin-glass-hover: var(--wiez-lg-hover-tint);
+  background-color: var(--wiez-admin-glass-bg);
+  background-image: var(--wiez-lg-sheen);
+  -webkit-backdrop-filter: blur(var(--wiez-lg-blur-subtle)) saturate(var(--wiez-lg-sat-subtle));
+  backdrop-filter: blur(var(--wiez-lg-blur-subtle)) saturate(var(--wiez-lg-sat-subtle));
+  border-color: transparent;
+  box-shadow: var(--wiez-lg-shadow);
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Soft brand: active tabs and selected chips. */
+.wiez-admin-glass :is(button, [role="tab"], a[role="button"]):is(
+    [class~="bg-purple-50"], [class~="bg-purple-100"], [class~="bg-purple-500/10"],
+    [class~="bg-purple-500/15"], [class~="bg-purple-500/20"]
+  ) {
+  --wiez-admin-glass-bg: color-mix(in srgb, var(--wiez-action-brand) 22%, transparent);
+  --wiez-admin-glass-hover: color-mix(in srgb, var(--wiez-action-brand) 30%, transparent);
+}
+/* Strong tones: primary, success, danger, info and ink actions keep white text. */
+.wiez-admin-glass :is(button, [role="tab"], a[role="button"]):is(
+    [class~="bg-purple-500"], [class~="bg-purple-600"], [class~="bg-purple-700"], [class~="bg-violet-600"]
+  ) {
+  --wiez-admin-glass-bg: color-mix(in srgb, var(--wiez-action-brand) 86%, transparent);
+  --wiez-admin-glass-hover: color-mix(in srgb, var(--wiez-action-brand-hover) 90%, transparent);
+}
+.wiez-admin-glass :is(button, [role="tab"], a[role="button"]):is(
+    [class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-green-600"]
+  ) {
+  --wiez-admin-glass-bg: color-mix(in srgb, #059669 86%, transparent);
+  --wiez-admin-glass-hover: color-mix(in srgb, #047857 90%, transparent);
+}
+.wiez-admin-glass :is(button, [role="tab"], a[role="button"]):is(
+    [class~="bg-red-500"], [class~="bg-red-600"], [class~="bg-rose-500"], [class~="bg-rose-600"]
+  ) {
+  --wiez-admin-glass-bg: color-mix(in srgb, var(--wiez-action-danger) 86%, transparent);
+  --wiez-admin-glass-hover: color-mix(in srgb, var(--wiez-action-danger) 94%, transparent);
+}
+.wiez-admin-glass :is(button, [role="tab"], a[role="button"]):is([class~="bg-blue-500"], [class~="bg-blue-600"]) {
+  --wiez-admin-glass-bg: color-mix(in srgb, #2563eb 86%, transparent);
+  --wiez-admin-glass-hover: color-mix(in srgb, #1d4ed8 90%, transparent);
+}
+.wiez-admin-glass :is(button, [role="tab"], a[role="button"]):is(
+    [class~="bg-gray-900"], [class~="bg-slate-900"], [class~="bg-slate-950"]
+  ) {
+  --wiez-admin-glass-bg: color-mix(in srgb, var(--wiez-action-primary) 86%, transparent);
+  --wiez-admin-glass-hover: color-mix(in srgb, var(--wiez-action-primary) 94%, transparent);
+}
+.wiez-admin-glass :is(button, [role="tab"], a[role="button"]):is(
+    [class~="bg-purple-500"], [class~="bg-purple-600"], [class~="bg-purple-700"], [class~="bg-violet-600"],
+    [class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-green-600"],
+    [class~="bg-red-500"], [class~="bg-red-600"], [class~="bg-rose-500"], [class~="bg-rose-600"],
+    [class~="bg-blue-500"], [class~="bg-blue-600"], [class~="bg-gray-900"], [class~="bg-slate-900"], [class~="bg-slate-950"],
+    [class~="bg-purple-50"], [class~="bg-purple-100"], [class~="bg-purple-500/10"], [class~="bg-purple-500/15"], [class~="bg-purple-500/20"]
+  ) {
+  background-color: var(--wiez-admin-glass-bg);
+  background-image: var(--wiez-lg-sheen);
+  -webkit-backdrop-filter: blur(var(--wiez-lg-blur-subtle)) saturate(var(--wiez-lg-sat-subtle));
+  backdrop-filter: blur(var(--wiez-lg-blur-subtle)) saturate(var(--wiez-lg-sat-subtle));
+  border-color: transparent;
+  box-shadow: var(--wiez-lg-shadow);
+}
+@media (hover: hover) {
+  .wiez-admin-glass :is(button, [role="tab"], a[role="button"]):is(
+      [class~="border"], [class~="bg-white"], [class~="bg-gray-50"], [class~="bg-gray-100"], [class~="bg-white/5"],
+      [class~="bg-white/10"], [class~="neu-pressed-button"], [class~="bg-purple-50"], [class~="bg-purple-100"],
+      [class~="bg-purple-500/10"], [class~="bg-purple-500/15"], [class~="bg-purple-500/20"], [class~="bg-purple-500"],
+      [class~="bg-purple-600"], [class~="bg-purple-700"], [class~="bg-violet-600"], [class~="bg-emerald-500"],
+      [class~="bg-emerald-600"], [class~="bg-green-600"], [class~="bg-red-500"], [class~="bg-red-600"],
+      [class~="bg-rose-500"], [class~="bg-rose-600"], [class~="bg-blue-500"], [class~="bg-blue-600"],
+      [class~="bg-gray-900"], [class~="bg-slate-900"], [class~="bg-slate-950"]
+    ):hover:not(:disabled) {
+    background-color: var(--wiez-admin-glass-hover);
+    border-color: transparent;
+  }
+}
+.wiez-admin-glass :is(button, [role="tab"], a[role="button"])[class*="bg-"]:active:not(:disabled) {
+  transform: scale(0.975);
+}
+/* Status pills and badges: soft glass tinted with their own text colour. */
+.wiez-admin-glass span[class~="rounded-full"][class*="px-"][class*="bg-"] {
+  background-color: color-mix(in srgb, currentColor 14%, transparent);
+  background-image: var(--wiez-lg-sheen);
+  border-color: transparent;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .wiez-admin-glass :is(button, [role="tab"], a[role="button"])[class*="bg-"],
+  .wiez-admin-glass :is(button, [role="tab"], a[role="button"])[class~="border"] {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-image: none;
+  }
+}
