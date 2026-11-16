@@ -4,14 +4,25 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { useAuth } from '@/context/AuthContext';
 import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
-import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import { hasActiveBrandMembership, isBrandAccount } from '@/lib/brandAccess';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 
 interface RequireBrandProps {
   children?: React.ReactNode;
+  /**
+   * 'store' (default): the account must be able to manage a store right now
+   * (an active membership, or a brand whose store exists).
+   * 'brand': the account must BE a brand (or brand staff), store or not. The
+   * Studio shell uses this: a brand that has just signed up has no store yet,
+   * and store setup itself lives inside Studio — gating Studio on having a
+   * store sent every new brand away with "session expired". Store-dependent
+   * Studio screens are still guarded by RequireStoreSetup, which routes a
+   * brand without a store to setup.
+   */
+  access?: 'store' | 'brand';
 }
 
-const RequireBrand: React.FC<RequireBrandProps> = ({ children }) => {
+const RequireBrand: React.FC<RequireBrandProps> = ({ children, access = 'store' }) => {
   const { profile: user } = useSelector((state: RootState) => state.user);
   const { loading } = useAuth();
   const embeddedSurface = useEmbeddedSurface();
@@ -37,7 +48,8 @@ const RequireBrand: React.FC<RequireBrandProps> = ({ children }) => {
 
   // If persisted user is stale/partial, wait for AuthProvider hydration
   // to avoid incorrect redirects.
-  if (!hasActiveBrandMembership(user)) {
+  const allowed = access === 'brand' ? isBrandAccount(user) : hasActiveBrandMembership(user);
+  if (!allowed) {
     if (loading && (user.type as any) == null) {
       return (
         <div className="flex items-center justify-center min-h-[240px]">

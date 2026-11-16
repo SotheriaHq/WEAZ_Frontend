@@ -181,9 +181,11 @@ const StudioRouteFallback: React.FC = () => {
 
 const noopStudioSelect = () => {};
 
+// Studio opens for any brand account, store or not: store setup lives inside
+// Studio, and RequireStoreSetup sends a brand without a store there.
 const StudioProtected: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <StudioHandoffGate>
-    <RequireBrand>{children}</RequireBrand>
+    <RequireBrand access="brand">{children}</RequireBrand>
   </StudioHandoffGate>
 );
 
