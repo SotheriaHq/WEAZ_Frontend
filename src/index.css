@@ -4281,3 +4281,27 @@ html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidd
     background-image: none;
   }
 }
+
+/*
+  wiez-light-control-ink (16 Nov 2026). On the light theme, neutral glass is
+  white over a white page, so secondary buttons and chips ("Share") barely read
+  as controls. Neutral INTERACTIVE glass gets a faint ink tint instead (dark
+  theme unchanged); toned, active and stage controls keep their own fills.
+*/
+:root:not(.dark) .wiez-lg-surface.wiez-lg-interactive:not([class*="wiez-lg-tone-"]):not(.wiez-lg-active):not(.wiez-lg-stage) {
+  --wiez-lg-local-bg: color-mix(in srgb, var(--wiez-text-primary, #0a0a0a) 7%, rgba(255, 255, 255, 0.55));
+  --wiez-lg-local-hover-bg: color-mix(in srgb, var(--wiez-text-primary, #0a0a0a) 11%, rgba(255, 255, 255, 0.6));
+}
+:root:not(.dark) .wiez-admin-glass :is(button, [role="tab"], a[role="button"]):is(
+    [class~="border"], [class~="bg-white"], [class~="bg-gray-50"], [class~="bg-gray-100"],
+    [class~="bg-white/5"], [class~="bg-white/10"], [class~="neu-pressed-button"]
+  ):not(:is(
+    [class~="bg-purple-500"], [class~="bg-purple-600"], [class~="bg-purple-700"], [class~="bg-violet-600"],
+    [class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-green-600"],
+    [class~="bg-red-500"], [class~="bg-red-600"], [class~="bg-rose-500"], [class~="bg-rose-600"],
+    [class~="bg-blue-500"], [class~="bg-blue-600"], [class~="bg-gray-900"], [class~="bg-slate-900"], [class~="bg-slate-950"],
+    [class~="bg-purple-50"], [class~="bg-purple-100"], [class~="bg-purple-500/10"], [class~="bg-purple-500/15"], [class~="bg-purple-500/20"]
+  )) {
+  --wiez-admin-glass-bg: color-mix(in srgb, var(--wiez-text-primary, #0a0a0a) 7%, rgba(255, 255, 255, 0.55));
+  --wiez-admin-glass-hover: color-mix(in srgb, var(--wiez-text-primary, #0a0a0a) 11%, rgba(255, 255, 255, 0.6));
+}
