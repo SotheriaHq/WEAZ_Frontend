@@ -98,8 +98,9 @@ describe('Wave 4A Product Detail Vertical Slice (ProductDetailModal)', () => {
     const mainBagBtn = bagButtons[0];
     expect(mainBagBtn).toBeDisabled();
 
-    // Canonical button contains WIEZ action-brand tokens without dark press shadow
-    expect(mainBagBtn.className).toContain('var(--wiez-action-brand)');
+    // Canonical brand button is brand-tinted Strong Lens glass (tone reads
+    // --wiez-action-brand), without the old dark press shadow.
+    expect(mainBagBtn).toHaveClass('wiez-lg-surface', 'wiez-lg-tone-brand');
     expect(mainBagBtn.className).not.toContain('active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.35)]');
 
     // Contains BagPulseIcon
@@ -172,9 +173,10 @@ describe('Wave 4A Product Detail Vertical Slice (ProductDetailModal)', () => {
     const wishlistBtns = screen.getAllByRole('button', { name: /Add to Wishlist/i });
     // wishlistBtns[0] is media heart button, wishlistBtns[1] is the secondary CTA
     const secondaryWishlistBtn = wishlistBtns[1];
-    expect(secondaryWishlistBtn.className).toContain('neu-pressed-button');
+    // Secondary actions are the canonical glass button (was neu-pressed-button).
+    expect(secondaryWishlistBtn).toHaveClass('wiez-lg-surface');
 
     const shareBtn = screen.getByRole('button', { name: /Share product/i });
-    expect(shareBtn.className).toContain('neu-pressed-button');
+    expect(shareBtn).toHaveClass('wiez-lg-surface');
   });
 });

@@ -86,12 +86,12 @@ export default function NoticeModalView({ notice, primaryRef, secondaryRef }: {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98 }}
               transition={{ duration: reduceMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="w-full max-w-[26rem] overflow-hidden rounded-[28px] border border-[color:var(--wiez-border-subtle)] bg-[color:var(--wiez-surface-modal)] shadow-[0_24px_60px_rgba(15,23,42,0.28)]"
+              className="wiez-dialog-surface w-full max-w-[26rem] overflow-hidden rounded-[28px]"
             >
               <div className="flex items-start gap-4 p-6">
                 <span
                   aria-hidden="true"
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ring-1 ${style.plate}`}
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl ${style.plate}`}
                 >
                   {notice.emoji ?? style.glyph}
                 </span>
@@ -121,7 +121,7 @@ export default function NoticeModalView({ notice, primaryRef, secondaryRef }: {
                 primary on top — where a thumb lands first — side by side from
                 `sm`, primary on the right.
               */}
-              <div className="flex flex-col-reverse gap-2 border-t border-[color:var(--wiez-border-subtle)] bg-[color:var(--wiez-surface-subtle)] px-6 py-4 sm:flex-row sm:justify-end">
+              <div className="wiez-dialog-actions flex flex-col-reverse gap-2 px-6 pb-6 pt-1 sm:flex-row sm:justify-end">
                 {hasAction ? (
                   <Button
                     ref={secondaryRef}
@@ -136,7 +136,7 @@ export default function NoticeModalView({ notice, primaryRef, secondaryRef }: {
                 <Button
                   ref={primaryRef}
                   type="button"
-                  variant={hasAction ? 'brand' : 'primary'}
+                  variant="brand"
                   onClick={() => {
                     const run = notice.action?.onSelect;
                     dismissNotice();

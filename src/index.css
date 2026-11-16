@@ -1642,11 +1642,40 @@ html {
      Dual-directional box-shadow required two GPU composite passes per modal.
      color-mix(in srgb,...) also had limited browser coverage pre-2023.
      Replaced with clean flat surfaces that read identically on all devices. */
+  /*
+    System dialog surface (16 Nov 2026). Every dialog and notice modal reads as
+    WIEZ: frosted glass on the theme's modal colour with a soft brand glow at
+    the top and a brand-tinted shadow. Borderless like the rest of the glass
+    (no ring, no hairline); the footer sits on the same surface with no divider.
+    `.neu-modal-surface` is the legacy name used by the shared Modal and most
+    bespoke dialogs, so both names resolve to the same surface.
+  */
+  .wiez-dialog-surface,
   .neu-modal-surface {
-    background-color: var(--neu-surface);
-    color: var(--neu-text);
-    border: 1px solid var(--neu-border);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    color: var(--wiez-text-primary, var(--neu-text));
+    background-color: color-mix(in srgb, var(--wiez-surface-modal) 90%, transparent);
+    background-image:
+      radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--wiez-action-brand) 16%, transparent) 0%, transparent 62%),
+      linear-gradient(180deg, color-mix(in srgb, var(--wiez-action-brand) 5%, transparent) 0%, transparent 40%);
+    -webkit-backdrop-filter: blur(28px) saturate(1.35);
+    backdrop-filter: blur(28px) saturate(1.35);
+    border: 0;
+    box-shadow:
+      0 28px 70px -24px rgba(0, 0, 0, 0.55),
+      0 18px 48px -26px color-mix(in srgb, var(--wiez-action-brand) 55%, transparent);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .wiez-dialog-surface,
+    .neu-modal-surface {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background-color: var(--wiez-surface-modal);
+    }
+  }
+  /* The action bar shares the dialog surface: no divider, no second colour. */
+  .wiez-dialog-actions {
+    background: transparent;
+    border-top: 0;
   }
   /* =========================================================================
      WIEZ LUMINA MULTI-SHADE (7-12 STOPS) GRADIENTS & PHYSICAL LIGHTING SYSTEM

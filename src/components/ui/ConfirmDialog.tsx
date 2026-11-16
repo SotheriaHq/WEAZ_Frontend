@@ -37,8 +37,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   const iconEmoji = isDestructive ? '⚠️' : 'ℹ️';
   const accentBg = isDestructive
-    ? 'bg-red-50 dark:bg-red-500/10 ring-1 ring-red-200/60 dark:ring-red-500/20'
-    : 'bg-[color:var(--wiez-action-brand-subtle,rgba(147,51,234,0.1))] ring-1 ring-[color:var(--wiez-border-subtle)]';
+    ? 'bg-red-50 dark:bg-red-500/10'
+    : 'bg-[color:var(--wiez-action-brand-subtle,rgba(147,51,234,0.12))]';
 
   return (
     <OverlayPortal>
@@ -57,13 +57,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           aria-labelledby="confirm-title"
           aria-describedby="confirm-message"
           tabIndex={-1}
-          className={`
-            relative w-[90%] max-w-md overflow-hidden rounded-[28px]
-            bg-[color:var(--wiez-surface-modal)] text-[color:var(--wiez-text-primary)]
-            shadow-2xl ring-1 ring-[color:var(--wiez-border-subtle)]
-            outline-none
-            ${isDestructive ? 'shadow-red-500/10 dark:shadow-red-500/20' : ''}
-          `}
+          className="wiez-dialog-surface relative w-[90%] max-w-md overflow-hidden rounded-[28px] outline-none"
         >
           {/* Header with icon */}
           <div className="flex flex-col items-center pt-8 pb-2 px-6">
@@ -79,7 +73,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 border-t border-[color:var(--wiez-border-subtle)] bg-[color:var(--wiez-surface-subtle)] px-6 py-4 mt-4">
+          <div className="wiez-dialog-actions flex gap-3 px-6 pb-6 pt-2 mt-4">
             <Button
               variant="secondary"
               onClick={onCancel}
@@ -89,7 +83,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               {cancelText}
             </Button>
             <Button
-              variant={isDestructive ? 'danger' : 'primary'}
+              variant={isDestructive ? 'danger' : 'brand'}
               onClick={onConfirm}
               autoFocus
               loading={isLoading}

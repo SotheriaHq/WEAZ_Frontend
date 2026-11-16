@@ -99,7 +99,15 @@ export function resolveLensOptics(shape: LensShape, spec = LIQUID_GLASS_LENS): L
   const minHalf = Math.min(hx, hy);
   const r = clamp(shape.r, 0, minHalf);
   const thickness = clamp(spec.opticalThickness, 0, 1);
-  const bezel = clamp(minHalf * spec.curvature * mix(0.6, 1.2, thickness), 3, Math.min(minHalf, lens.bezelMaxDp));
+  // The curved edge never reaches past the control's own corner radius. A
+  // capsule (r = short half-axis) still gets a full dome; a 12px-corner button
+  // gets a 12px bezel, so its highlight contour follows ITS corners instead of
+  // drawing a capsule-shaped ring inside them (the "extra edges" defect).
+  const bezel = clamp(
+    minHalf * spec.curvature * mix(0.6, 1.2, thickness),
+    3,
+    Math.min(minHalf, lens.bezelMaxDp, Math.max(r, 3)),
+  );
   const magnify = spec.refractionStrength > 0.001 ? lens.magnify : 0;
   const designShift = Math.min(
     lens.depthFrac * bezel * mix(0.6, 1.25, thickness),

@@ -67,6 +67,16 @@ describe('Strong Lens surface model', () => {
     expect(rim?.highlight ?? 0).toBeGreaterThan(0);
   });
 
+  it('keeps the highlight contour on the control corners (no capsule ring inside a rounded rect)', () => {
+    // Regression (16 Nov 2026): a 12px-corner dialog button showed a capsule-shaped
+    // highlight ring inside its corners because the bezel ran to the half-height.
+    const button = resolveLensOptics({ w: 220, h: 48, r: 12 });
+    expect(button.bezel).toBeLessThanOrEqual(12);
+    expect(button.r2).toBe(12);
+    const capsule = resolveLensOptics(SHAPES.chip);
+    expect(capsule.bezel).toBeCloseTo(capsule.minHalf, 5);
+  });
+
   it('a capsule bends along its short axis everywhere, not like a stretched circle', () => {
     const o = resolveLensOptics(SHAPES.island);
     expect(o.bezel).toBeCloseTo(28, 5);
