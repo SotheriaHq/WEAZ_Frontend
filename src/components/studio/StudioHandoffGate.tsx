@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 
 import { apiClient, persistAccessToken } from '@/api/httpClient';
 import { clearWebPrivateCaches, readStoredWebUserId } from '@/auth/sessionCleanup';
+import { beginStudioHandoff, endStudioHandoff } from '@/auth/studioHandoffAuthority';
 import { queryClient } from '@/query/queryClient';
 import type { AppDispatch } from '@/store';
 import { setUser } from '@/features/userSlice';
@@ -197,6 +198,8 @@ export const StudioHandoffGate: React.FC<StudioHandoffGateProps> = ({ children }
       // Read before the exchange: the account this document held until now.
       const previousUserId = readStoredWebUserId();
       let failureStage = 'exchange';
+      // Until this settles, nothing else may decide who is signed in here.
+      beginStudioHandoff();
       try {
         const { user } = await exchangeStudioHandoffOnce(
           handoffCode,
@@ -237,6 +240,8 @@ export const StudioHandoffGate: React.FC<StudioHandoffGateProps> = ({ children }
           setMessage('We could not open Studio securely. Return to the app and try again.');
           setStatus('failed');
         }
+      } finally {
+        endStudioHandoff();
       }
     };
 

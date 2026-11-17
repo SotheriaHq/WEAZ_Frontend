@@ -24,6 +24,7 @@ import { queryClient } from '@/query/queryClient';
 import { queryKeys } from '@/query/queryKeys';
 import { clearWebPrivateSessionState } from '@/auth/sessionCleanup';
 import { SecurityVerificationCancelled } from '@/auth/securityChallenge';
+import { isStudioHandoffInFlight } from '@/auth/studioHandoffAuthority';
 
 interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
@@ -180,6 +181,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     let isMounted = true;
 
     const onAuthExpired = (event: Event) => {
+      // The previous session of a document that is being handed a new one:
+      // its failure is not this session expiring. Clearing here wiped the user
+      // the handoff had just set (see studioHandoffAuthority).
+      if (isStudioHandoffInFlight()) return;
       const shouldNotify = bootstrapCompleteRef.current && hasPersistedSessionEvidence();
       const preserveSharedAuthStorage = (event as CustomEvent)?.detail?.preserveSharedAuthStorage === true;
       if (preserveSharedAuthStorage) void clearPrivateSession({ preserveSharedAuthStorage: true });
@@ -221,7 +226,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }, 8_000);
 
       try {
-        if (!hasPersistedSessionEvidence()) {
+        // The mobile app is handing this document its session; restoring the
+        // saved one alongside it raced the handoff for who is signed in.
+        if (!hasPersistedSessionEvidence() || isStudioHandoffInFlight()) {
           return;
         }
         await fetchUserProfile();

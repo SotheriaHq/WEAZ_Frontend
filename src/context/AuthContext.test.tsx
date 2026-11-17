@@ -315,4 +315,45 @@ describe('AuthProvider profile bootstrap', () => {
     expect(store.getState().user.profile).toBeNull(); expect(localStorage.getItem(env.userStorageKey)).toBe(snapshot);
     expect(clearWebPrivateSessionState).toHaveBeenCalledWith(expect.objectContaining({ preserveSharedAuthStorage: true }));
   });
+
+  // Regression (17 Nov 2026): a new brand on a phone that had been signed in
+  // before opened store setup and got "Studio session expired". The WebView's
+  // saved identity made this provider restore the OLD session alongside the
+  // mobile handoff, and its failure cleared the user the handoff had just set.
+  describe('while the mobile app is handing this document a session', () => {
+    const withHandoffUrl = async (run: () => Promise<void>) => {
+      const original = window.location.pathname + window.location.search;
+      window.history.replaceState(null, '', '/studio/store/setup?surface=mobile-app&handoffCode=code-id.secret');
+      try {
+        await run();
+      } finally {
+        window.history.replaceState(null, '', original);
+      }
+    };
+
+    it('does not restore the saved session in parallel with the handoff', async () => {
+      await withHandoffUrl(async () => {
+        persistBaseUser();
+        renderAuthProvider();
+        await waitFor(() => expect(screen.getByText('auth ready')).toBeInTheDocument());
+        expect(refreshAccessToken).not.toHaveBeenCalled();
+        expect(apiGet).not.toHaveBeenCalled();
+        expect(clearWebPrivateSessionState).not.toHaveBeenCalled();
+      });
+    });
+
+    it('ignores the previous session expiring, keeping the handed-over user', async () => {
+      await withHandoffUrl(async () => {
+        persistBaseUser();
+        const { store } = renderAuthProvider();
+        await waitFor(() => expect(screen.getByText('auth ready')).toBeInTheDocument());
+        const handedOver = { ...baseUser, id: 'new-brand', type: 'BRAND' } as AuthUserDto;
+        act(() => { store.dispatch({ type: 'user/setUser', payload: handedOver }); });
+        act(() => { window.dispatchEvent(new CustomEvent('auth:expired')); });
+        expect(store.getState().user.profile?.id).toBe('new-brand');
+        expect(clearWebPrivateSessionState).not.toHaveBeenCalled();
+        expect(toastInfo).not.toHaveBeenCalled();
+      });
+    });
+  });
 });
