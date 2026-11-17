@@ -26,10 +26,8 @@
 
 /* Read/Unread States */
 .notification-item.unread {
-  background: linear-gradient(135deg,
-      rgba(139, 92, 246, 0.08) 0%,
-      rgba(168, 85, 247, 0.04) 100%);
-  border-left-color: #8b5cf6;
+  background: var(--wiez-surface-card, #ffffff);
+  border-left-color: var(--wiez-action-brand, #9333ea);
 }
 
 .notification-item.read {
@@ -219,7 +217,7 @@
 .timestamp {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--wiez-text-muted, #525f72);
   margin-top: 0.125rem;
 }
 

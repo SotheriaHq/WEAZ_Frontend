@@ -306,7 +306,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
               </div>
             )}
             <div className="px-2.5 py-1.5 bg-white/80 dark:bg-black/30 backdrop-blur-sm">
-              <p className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 truncate leading-snug">
+              <p className="text-[11px] font-semibold text-gray-800 dark:text-gray-100 break-words leading-snug">
                 {isProductContext ? '🛍️' : '🎨'} {String(contextTitle)}
                 {canOpenDesignContext ? (
                   <span className="ml-1 font-normal text-purple-600 dark:text-purple-300">
@@ -354,8 +354,8 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isOwn, show
             isModerated && showModerated
               ? 'bg-red-50/80 dark:bg-red-950/40 text-gray-900 dark:text-red-100 rounded-bl-md'
               : isOwn
-                ? 'bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white rounded-br-md'
-                : 'bg-gray-100 text-gray-900 dark:bg-[#252732] dark:text-gray-50 rounded-bl-md'
+                ? 'bg-[color:var(--wiez-action-brand)] text-white rounded-br-md'
+                : 'bg-[color:var(--wiez-surface-recessed)] text-[color:var(--wiez-text-primary)] dark:bg-[#252732] dark:text-gray-50 rounded-bl-md'
           }`}
         >
           {isRedacted && !showModerated ? (

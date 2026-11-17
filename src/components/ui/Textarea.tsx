@@ -46,7 +46,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
       rounded-2xl
       text-[color:var(--wiez-text-primary)]
       placeholder:text-[color:var(--wiez-text-placeholder)]
-      shadow-[0_2px_8px_rgba(124,58,237,0.04)] dark:shadow-[0_2px_8px_rgba(124,58,237,0.18)]
+      shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:shadow-[0_2px_8px_rgba(124,58,237,0.18)]
       border-0
       focus:outline-none focus:shadow-[0_0_22px_2px_rgba(168,85,247,0.32),0_4px_14px_-2px_rgba(147,51,234,0.18)] dark:focus:shadow-[0_0_26px_3px_rgba(192,132,252,0.38),0_6px_20px_-2px_rgba(147,51,234,0.28)] focus:scale-[1.006]
       transition-all duration-200

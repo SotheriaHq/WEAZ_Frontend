@@ -63,14 +63,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       rounded-2xl
       text-[color:var(--wiez-text-primary)]
       placeholder:text-[color:var(--wiez-text-placeholder)]
-      shadow-[0_2px_8px_rgba(124,58,237,0.04)] dark:shadow-[0_2px_8px_rgba(124,58,237,0.2)]
+      shadow-[0_1px_3px_rgba(15,23,42,0.06)] dark:shadow-[0_2px_8px_rgba(124,58,237,0.2)]
       border-0
       focus:outline-none focus:shadow-[0_0_22px_2px_rgba(168,85,247,0.32),0_4px_14px_-2px_rgba(147,51,234,0.18)] dark:focus:shadow-[0_0_26px_3px_rgba(192,132,252,0.38),0_6px_20px_-2px_rgba(147,51,234,0.28)] focus:scale-[1.006]
       transition-all duration-200
       ${
         error
           ? '!border-0 !border-transparent !shadow-[0_0_22px_2px_rgba(244,63,94,0.32),0_4px_14px_-2px_rgba(225,29,72,0.18)]'
-          : 'hover:shadow-[0_3px_12px_rgba(124,58,237,0.08)] dark:hover:shadow-[0_3px_12px_rgba(124,58,237,0.3)]'
+          : 'hover:shadow-[0_2px_8px_rgba(15,23,42,0.09)] dark:hover:shadow-[0_3px_12px_rgba(124,58,237,0.3)]'
       }
       ${
         disabled

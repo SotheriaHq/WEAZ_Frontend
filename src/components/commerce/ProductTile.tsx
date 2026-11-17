@@ -39,10 +39,10 @@ function ProductTileRoot({ selected = false, className = '', children, ...rest }
     <article
       {...rest}
       className={[
-        'group relative flex h-full flex-col overflow-hidden rounded-2xl border-0 bg-white shadow-md shadow-purple-950/5 transition-shadow duration-300 ease-out dark:bg-zinc-900 dark:shadow-purple-950/30',
+        'group relative flex h-full flex-col overflow-hidden rounded-2xl border-0 bg-[color:var(--wiez-surface-card)] shadow-sm shadow-slate-900/5 transition-shadow duration-300 ease-out dark:bg-zinc-900 dark:shadow-purple-950/30',
         selected
-          ? 'ring-2 ring-purple-500'
-          : 'hover:shadow-xl hover:shadow-purple-500/15',
+          ? 'ring-2 ring-[color:var(--wiez-action-brand)]'
+          : 'hover:shadow-md hover:shadow-slate-900/10',
         className,
       ].join(' ')}
     >
@@ -55,7 +55,7 @@ function ProductTileMedia({ className = '', children, ...rest }: DivProps) {
   return (
     <div
       {...rest}
-      className={`relative w-full shrink-0 overflow-hidden rounded-2xl bg-gray-100 dark:bg-zinc-800/50 ${PRODUCT_TILE_MEDIA_ASPECT} ${className}`}
+      className={`relative w-full shrink-0 overflow-hidden rounded-2xl bg-[color:var(--wiez-surface-recessed)] dark:bg-zinc-800/50 ${PRODUCT_TILE_MEDIA_ASPECT} ${className}`}
     >
       {children}
     </div>
@@ -92,7 +92,7 @@ function ProductTileMeta({ className = '', children, ...rest }: DivProps) {
   return (
     <div
       {...rest}
-      className={`flex min-w-0 items-center gap-1.5 truncate text-[11px] font-semibold text-gray-500 dark:text-zinc-400 ${className}`}
+      className={`flex min-w-0 flex-wrap items-center gap-1.5 break-words text-[11px] font-semibold text-[color:var(--wiez-text-muted)] dark:text-zinc-400 ${className}`}
     >
       {children}
     </div>
@@ -110,7 +110,7 @@ export interface ProductTilePriceProps {
 function ProductTilePrice({ price, compareAt, className = '', children }: ProductTilePriceProps) {
   return (
     <div className={`flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 ${className}`}>
-      <span className="bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 bg-clip-text text-sm font-black tracking-tight text-transparent dark:from-purple-300 dark:via-indigo-300 dark:to-pink-300 sm:text-base">
+      <span className="text-sm font-black tracking-tight text-[color:var(--wiez-text-primary)] dark:text-white sm:text-base">
         {price}
       </span>
       {compareAt ? (
@@ -180,7 +180,7 @@ export function BagItButton({
       <span className="wiez-bag-it-chip" aria-hidden="true">
         {BAG_IT_EMOJI}
       </span>
-      <span className="truncate">{busy ? 'Bagging…' : label}</span>
+      <span className="break-words">{busy ? 'Bagging…' : label}</span>
       {live ? (
         <span aria-hidden="true" className="font-bold">
           ›

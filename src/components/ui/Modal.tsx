@@ -92,28 +92,14 @@ const Modal: React.FC<ModalProps> = ({
               onClick={onClose}
             >
               {glassBackdrop ? (
-                <>
-                  <div
-                    className={clsx(
-                      'absolute inset-0',
-                      backdropStyle === 'light'
-                        ? 'bg-gradient-to-br from-slate-700/[0.12] via-indigo-700/10 to-sky-700/[0.12]'
-                        : 'bg-gradient-to-br from-purple-900/40 via-indigo-900/50 to-blue-900/40'
-                    )}
-                  />
-                  <div
-                    className={clsx(
-                      'absolute inset-0',
-                      backdropStyle === 'light' ? 'backdrop-blur-md' : 'backdrop-blur-xl'
-                    )}
-                  />
-                  <div
-                    className={clsx(
-                      'absolute inset-0',
-                      backdropStyle === 'light' ? 'bg-black/[0.12]' : 'bg-black/40'
-                    )}
-                  />
-                </>
+                <div
+                  className={clsx(
+                    'absolute inset-0 backdrop-blur-md',
+                    backdropStyle === 'light'
+                      ? 'bg-slate-950/20 dark:bg-black/45'
+                      : 'bg-slate-950/40 dark:bg-black/65'
+                  )}
+                />
               ) : (
                 <div
                   className={clsx(
