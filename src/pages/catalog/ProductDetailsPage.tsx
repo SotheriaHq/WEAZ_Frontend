@@ -692,7 +692,7 @@ export default function ProductDetailsPage({ resolvedProductId }: ProductDetails
                     type="button"
                     onClick={handleModalSaveAndAdd}
                     disabled={savingMeasurements}
-                    className="w-full py-3 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-full bg-[color:var(--wiez-action-brand)] hover:bg-[color:var(--wiez-action-brand-hover)] text-white text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {savingMeasurements ? (
                       <>

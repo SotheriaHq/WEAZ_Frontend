@@ -87,7 +87,7 @@ const DiagnosticsPage: React.FC = () => {
   };
 
   return (
-    <main className="min-h-screen bg-white px-4 py-6 text-gray-950 dark:bg-black dark:text-white">
+    <main className="min-h-screen bg-[color:var(--wiez-surface-page)] px-4 py-6 text-[color:var(--wiez-text-primary)] dark:bg-black dark:text-white">
       <div className="mx-auto max-w-3xl space-y-4">
         <header className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-purple-600">

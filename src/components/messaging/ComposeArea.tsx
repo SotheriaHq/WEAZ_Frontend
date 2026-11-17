@@ -375,7 +375,7 @@ const ComposeArea: React.FC<ComposeAreaProps> = memo(({
           type="button"
           onClick={() => void handleSend()}
           disabled={!canSend}
-          className="shrink-0 h-9 w-9 sm:h-10 sm:w-10 overflow-hidden rounded-xl bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-purple-500/25 transition-shadow"
+          className="shrink-0 h-9 w-9 sm:h-10 sm:w-10 overflow-hidden rounded-xl bg-[color:var(--wiez-action-brand)] hover:bg-[color:var(--wiez-action-brand-hover)] text-white flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-colors"
           aria-label={sending ? 'Sending message' : 'Send message'}
           aria-busy={sending}
         >

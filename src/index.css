@@ -316,30 +316,30 @@ html {
     --wiez-action-primary-text: #ffffff;
     --wiez-action-brand: #9333ea;
     --wiez-action-brand-hover: #7e22ce;
-    --wiez-action-brand-pressed: #af87f4;
+    --wiez-action-brand-pressed: #6b21a8;
     --wiez-action-secondary: #eff0ed;
     --wiez-action-secondary-text: #252824;
     --wiez-action-danger: #ef4444;
 
-    --wiez-surface-page: #ffffff;
-    --wiez-surface-card: #f5f5f4;
-    --wiez-surface-subtle: #e7e5e4;
-    --wiez-surface-recessed: #eff0ed;
+    --wiez-surface-page: #f8fafc;
+    --wiez-surface-card: #ffffff;
+    --wiez-surface-subtle: #f1f5f9;
+    --wiez-surface-recessed: #f1f5f9;
     --wiez-surface-elevated: #ffffff;
-    --wiez-surface-modal: #eff0ed;
-    --wiez-surface-stage: #000000;
+    --wiez-surface-modal: #ffffff;
+    --wiez-surface-stage: #080a0f;
 
     --wiez-text-primary: #0a0a0a;
-    --wiez-text-secondary: #44403c;
-    --wiez-text-muted: #6b6560;
-    --wiez-text-placeholder: #98a4b8;
+    --wiez-text-secondary: #475569;
+    --wiez-text-muted: #525f72;
+    --wiez-text-placeholder: #5e6b7e;
     --wiez-text-disabled: #9aa5b5;
 
-    --wiez-border-default: #e5e5e5;
-    --wiez-border-subtle: #f1f5f9;
-    --wiez-border-strong: #d4d4d4;
+    --wiez-border-default: #e2e8f0;
+    --wiez-border-subtle: #e2e8f0;
+    --wiez-border-strong: #cbd5e1;
     --wiez-border-input: #cfcfcf;
-    --wiez-border-focus: #c084fc;
+    --wiez-border-focus: #9333ea;
 
     /* The loader's ink, light ground. `.dark` swaps it.
 
@@ -375,9 +375,9 @@ html {
     --profile-photo-ring-viewed: color-mix(in srgb, var(--text-secondary) 55%, var(--surface-muted));
 
     /* Surface + Typography - Clean Editorial Theme */
-    --surface-primary: #ffffff;
-    --surface-secondary: #faf8ff;  /* ethereal Lumina porcelain with soft violet mist */
-    --surface-muted: #f3efff;      /* soft Lumina lavender tint for dividers, controls */
+    --surface-primary: var(--wiez-surface-page);   /* #f8fafc quiet off-white baseline canvas */
+    --surface-secondary: var(--wiez-surface-card); /* #ffffff crisp content surface */
+    --surface-muted: var(--wiez-surface-subtle);   /* #f1f5f9 neutral recessed well */
     /* Theme-aware remap of the grey shades that carry hardcoded body text.
        LIGHT: one-to-two steps deeper than Tailwind's defaults, because on a
        white page the stock mid-greys read as disabled text.
@@ -391,17 +391,11 @@ html {
     --ink-slate-400: 100 116 139;
     --ink-slate-500: 65 78 99;
 
-    --text-primary: #0a0a0a;       /* near-black, a shade deeper than before */
-    /* Was #78716c — stone-500. Against a white page that is ~4.7:1: legal, but
-       it reads as disabled text, and it is what most secondary copy in the app
-       uses. Stone-700 keeps the warm cast and roughly doubles the contrast, so
-       the LEAST prominent tier is still unmistakably ink rather than grey. */
-    --text-secondary: #44403c;
-    /* A genuine third tier, so anything that truly is de-emphasised has
-       somewhere to go other than making `secondary` lighter again. */
-    --text-muted: #6b6560;
-    --border-default: #e5e5e5;     /* standard 1px card/input border */
-    --border-strong: #d4d4d4;      /* stronger border for emphasis */
+    --text-primary: var(--wiez-text-primary);
+    --text-secondary: var(--wiez-text-secondary);
+    --text-muted: var(--wiez-text-muted);
+    --border-default: var(--wiez-border-default);
+    --border-strong: var(--wiez-border-strong);
     --field-border: #cfcfcf;       /* clearly visible form input border */
     --field-border-hover: #9ca3af; /* input border on hover */
 
@@ -2033,7 +2027,6 @@ html {
       box-shadow 160ms ease,
       filter 160ms ease;
     transform: translateZ(0);
-    will-change: transform;
   }
 
   .neu-btn-press:hover,
