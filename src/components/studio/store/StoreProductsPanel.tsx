@@ -2412,7 +2412,7 @@ const StoreProductsPanel: React.FC<StoreProductsPanelProps> = ({
               <button
                 type="button"
                 onClick={() => navigate('/studio/store/products/new')}
-                className="hidden items-center gap-1.5 whitespace-nowrap rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-3 py-2 text-xs font-semibold text-white transition-all duration-200 active:scale-95 sm:inline-flex sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm border-0 shadow-sm"
+                className="hidden items-center gap-1.5 whitespace-nowrap rounded-xl bg-[color:var(--wiez-action-brand)] hover:bg-[color:var(--wiez-action-brand-hover)] px-3 py-2 text-xs font-semibold text-white transition-all duration-200 active:scale-95 sm:inline-flex sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm border-0 shadow-sm"
                 aria-label={primaryProductActionLabel}
                 title={primaryProductActionLabel}
               >

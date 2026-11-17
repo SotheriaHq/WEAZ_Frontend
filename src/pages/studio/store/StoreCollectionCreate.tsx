@@ -2713,7 +2713,7 @@ const StoreCollectionCreate: React.FC = () => {
           <button
             type="button"
             onClick={() => setMobileStep('details')}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/25 transition hover:-translate-y-0.5 lg:hidden"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[color:var(--wiez-action-brand)] hover:bg-[color:var(--wiez-action-brand-hover)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 lg:hidden"
           >
             Next: Collection details
             <span aria-hidden="true">→</span>
