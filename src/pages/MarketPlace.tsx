@@ -533,7 +533,7 @@ export const MarketPlace: React.FC = () => {
                   aria-pressed={active}
                   className={`relative whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-all ${
                     active
-                      ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-active wiez-lg-interactive font-bold'
+                      ? 'wiez-lg-surface wiez-lg-subtle wiez-lg-active wiez-lg-interactive'
                       : 'chip-inset text-theme-secondary hover:text-theme hover:bg-[color:var(--surface-muted)]'
                   }`}
                 >

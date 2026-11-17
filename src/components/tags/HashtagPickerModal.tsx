@@ -251,24 +251,15 @@ export default function HashtagPickerModal({
                           type="button"
                           onClick={() => onToggle(tag)}
                           disabled={atCap && !isSelected}
-                          className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-medium transition-all duration-200 border ${
+                          className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-all duration-200 border-2 ${
                             isSelected
-                              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-transparent shadow-md shadow-purple-500/25 font-semibold'
+                              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-purple-600 shadow-md shadow-purple-500/25'
                               : atCap
                                 ? 'cursor-not-allowed opacity-40 border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 text-gray-400'
                                 : 'tag-badge-outline border-purple-500/20 text-theme-secondary hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-300'
                           }`}
                         >
-                          {isSelected && (
-                            <motion.span
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              className="text-[10px]"
-                            >
-                              ✅
-                            </motion.span>
-                          )}
-                          <span className="truncate">{normalizeHashtagLabel(tag)}</span>
+                          <span className="whitespace-nowrap">{normalizeHashtagLabel(tag)}</span>
                         </motion.button>
                       );
                     })}
