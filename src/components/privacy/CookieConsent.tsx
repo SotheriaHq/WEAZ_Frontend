@@ -169,7 +169,7 @@ export default function CookieConsent() {
               WIEZ uses essential cookies to keep you signed in, protect your account and remember
               your bag. With your OK, we’d also like to measure visits so we can make WIEZ faster. We
               never sell your data.{' '}
-              <Link to="/cookies" className="font-semibold text-[var(--text-primary)] underline underline-offset-2">
+              <Link to="/cookies" className="whitespace-nowrap font-semibold text-[var(--text-primary)] underline underline-offset-2">
                 Cookie policy
               </Link>
             </p>
