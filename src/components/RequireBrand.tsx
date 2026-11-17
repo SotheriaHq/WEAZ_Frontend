@@ -29,6 +29,20 @@ const RequireBrand: React.FC<RequireBrandProps> = ({ children, access = 'store' 
   const isEmbeddedMobile = embeddedSurface === 'mobile-app';
 
   if (!user) {
+    /*
+      Still restoring the session (cookie refresh + /auth/profile). The Studio
+      WebView often opens on an existing document without a fresh handoff code,
+      so the user arrives a few seconds after first paint. Declaring "no user"
+      before restoration finished posted AUTH_REQUIRED and the app showed
+      "Studio session expired" to a brand that was signed in all along.
+    */
+    if (loading) {
+      return (
+        <div className="flex min-h-[240px] items-center justify-center">
+          <div className="text-sm text-gray-500">Opening Studio...</div>
+        </div>
+      );
+    }
     if (isEmbeddedMobile) {
       postStudioNativeEvent({ type: 'AUTH_REQUIRED', reason: 'missing_user' });
       return (

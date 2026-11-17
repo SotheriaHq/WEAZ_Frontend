@@ -2,14 +2,14 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const state: { profile: Record<string, unknown> | null } = { profile: null };
+const state: { profile: Record<string, unknown> | null; loading: boolean } = { profile: null, loading: false };
 const postStudioNativeEvent = vi.fn();
 
 vi.mock('react-redux', () => ({
   useSelector: (selector: (root: { user: { profile: unknown } }) => unknown) =>
     selector({ user: { profile: state.profile } }),
 }));
-vi.mock('@/context/AuthContext', () => ({ useAuth: () => ({ loading: false }) }));
+vi.mock('@/context/AuthContext', () => ({ useAuth: () => ({ loading: state.loading }) }));
 vi.mock('@/hooks/useEmbeddedSurface', () => ({ useEmbeddedSurface: () => 'mobile-app' }));
 vi.mock('@/utils/studioNativeBridge', () => ({
   postStudioNativeEvent: (event: unknown) => postStudioNativeEvent(event),
@@ -32,6 +32,26 @@ const renderGate = (access?: 'store' | 'brand') =>
 describe('RequireBrand', () => {
   beforeEach(() => {
     postStudioNativeEvent.mockClear();
+    state.loading = false;
+  });
+
+  // Regression (17 Nov 2026): the Studio WebView often reuses its document
+  // without a fresh handoff, so the session is restored a few seconds after
+  // first paint. Reporting "no user" during that restore told a signed-in
+  // brand its Studio session had expired.
+  it('waits for session restoration instead of reporting a missing user', () => {
+    state.profile = null;
+    state.loading = true;
+    renderGate('brand');
+    expect(screen.getByText('Opening Studio...')).toBeInTheDocument();
+    expect(postStudioNativeEvent).not.toHaveBeenCalled();
+  });
+
+  it('reports a missing user only once restoration has finished', () => {
+    state.profile = null;
+    state.loading = false;
+    renderGate('brand');
+    expect(postStudioNativeEvent).toHaveBeenCalledWith({ type: 'AUTH_REQUIRED', reason: 'missing_user' });
   });
 
   it('lets a brand with no store into Studio (access="brand")', () => {
