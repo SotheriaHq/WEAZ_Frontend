@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '@/store';
-import { hasActiveBrandMembership } from '@/lib/brandAccess';
+import { isBrandAccount } from '@/lib/brandAccess';
+import { useStoreSetupStatus } from '@/hooks/useStoreSetupStatus';
+import type { StoreStatusResponse } from '@/api/StoreApi';
 
 interface SidebarItem {
   key: string;
@@ -11,6 +13,7 @@ interface SidebarItem {
   icon: string;
   danger?: boolean;
   description?: string;
+  requiresStoreSetup?: boolean;
   nonAdmin?: boolean;
   endUserOnly?: boolean; // hidden for brand accounts (shopper-only settings)
 }
@@ -25,16 +28,29 @@ interface SidebarGroup {
 
 const sidebarGroups: SidebarGroup[] = [
   {
-    id: 'personal',
-    label: 'Personal',
+    id: 'privacy-security',
+    label: 'Privacy & Security',
     items: [
       {
         key: 'account-security',
-        label: 'Account & Security',
+        label: 'Account Security',
         path: '/settings?tab=account-security',
         icon: '👤',
         description: 'Email, password, devices',
       },
+      {
+        key: 'privacy',
+        label: 'Privacy Controls',
+        path: '/settings?tab=privacy',
+        icon: '🛡️',
+        description: 'Data & visibility',
+      },
+    ],
+  },
+  {
+    id: 'personal',
+    label: 'Personal',
+    items: [
       {
         key: 'notifications',
         label: 'Notifications',
@@ -48,13 +64,6 @@ const sidebarGroups: SidebarGroup[] = [
         path: '/settings?tab=email-preferences',
         icon: '📧',
         description: 'Scenario-level email delivery',
-      },
-      {
-        key: 'privacy',
-        label: 'Privacy',
-        path: '/settings?tab=privacy',
-        icon: '🛡️',
-        description: 'Data & visibility',
       },
       {
         key: 'profile-visibility',
@@ -106,6 +115,7 @@ const sidebarGroups: SidebarGroup[] = [
         path: '/settings?tab=billing',
         icon: '🏦',
         description: 'Wallet, payout account, and payout history',
+        requiresStoreSetup: true,
       },
     ],
   },
@@ -136,10 +146,10 @@ const sidebarGroups: SidebarGroup[] = [
     collapsible: true,
     brandOnly: true,
     items: [
-      { key: 'store-category-requests', label: 'Category requests', path: '/settings?tab=store-category-requests', icon: '📝', description: 'Request and track category approval' },
+      { key: 'store-category-requests', label: 'Category requests', path: '/settings?tab=store-category-requests', icon: '📝', description: 'Request and track category approval', requiresStoreSetup: true },
       {
         key: 'store-customers', label: 'Customers', path: '/settings?tab=store-customers',
-        icon: '👥', description: 'Customer purchase threshold · paid plans',
+        icon: '👥', description: 'Customer purchase threshold · paid plans', requiresStoreSetup: true,
       },
       {
         key: 'subscription-billing',
@@ -154,6 +164,7 @@ const sidebarGroups: SidebarGroup[] = [
         path: '/settings?tab=store-general',
         icon: '⚙️',
         description: 'Store name, bio, logo',
+        requiresStoreSetup: true,
       },
       {
         key: 'store-hours',
@@ -161,6 +172,7 @@ const sidebarGroups: SidebarGroup[] = [
         path: '/settings?tab=store-hours',
         icon: '🕒',
         description: 'Days & hours you operate',
+        requiresStoreSetup: true,
       },
       {
         key: 'store-social',
@@ -168,6 +180,7 @@ const sidebarGroups: SidebarGroup[] = [
         path: '/settings?tab=store-social',
         icon: '🔗',
         description: 'Social links, verification',
+        requiresStoreSetup: true,
       },
       {
         key: 'store-policies',
@@ -175,6 +188,7 @@ const sidebarGroups: SidebarGroup[] = [
         path: '/settings?tab=store-policies',
         icon: '📄',
         description: 'Return, shipping, terms',
+        requiresStoreSetup: true,
       },
       {
         key: 'store-team',
@@ -182,6 +196,7 @@ const sidebarGroups: SidebarGroup[] = [
         path: '/settings?tab=store-team',
         icon: '👥',
         description: 'Manage access',
+        requiresStoreSetup: true,
       },
       {
         key: 'store-notifications',
@@ -189,6 +204,7 @@ const sidebarGroups: SidebarGroup[] = [
         path: '/settings?tab=store-notifications',
         icon: '🔔',
         description: 'Order & store alerts',
+        requiresStoreSetup: true,
       },
       {
         key: 'store-danger',
@@ -197,6 +213,7 @@ const sidebarGroups: SidebarGroup[] = [
         icon: '⚠️',
         danger: true,
         description: 'Close or delete store',
+        requiresStoreSetup: true,
       },
     ],
   },
@@ -219,6 +236,65 @@ export function getItemForKey(key: string): SidebarItem | undefined {
     if (item) return item;
   }
   return undefined;
+}
+
+export function getVisibleSettingsGroups({
+  isBrandUser,
+  isAdmin,
+  storeSetupComplete,
+}: {
+  isBrandUser: boolean;
+  isAdmin: boolean;
+  storeSetupComplete: boolean | null;
+}): SidebarGroup[] {
+  return sidebarGroups
+    .filter((group) => !group.brandOnly || isBrandUser)
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) =>
+          (!isAdmin || !item.nonAdmin) &&
+          (!isBrandUser || !item.endUserOnly) &&
+          (!item.requiresStoreSetup || !isBrandUser || storeSetupComplete === true),
+      ),
+    }));
+}
+
+export function resolveSettingsTab(
+  active: string,
+  isBrandUser: boolean,
+  storeStatus: StoreStatusResponse | null,
+): string {
+  const normalizedAccountTab =
+    active === 'account' || active === 'security' ? 'account-security' : active;
+  const normalizedActive =
+    isBrandUser && normalizedAccountTab === 'store-payments'
+      ? 'billing'
+      : normalizedAccountTab;
+
+  if (
+    !isBrandUser &&
+    (normalizedActive.startsWith('store-') || normalizedActive === 'subscription-billing')
+  ) {
+    return 'account-security';
+  }
+
+  const needsPublishedStoreHours =
+    normalizedActive === 'store-hours' &&
+    storeStatus?.isPublished === true &&
+    storeStatus.workingHoursRequired === true &&
+    storeStatus.businessHoursConfigured === false;
+  const item = getItemForKey(normalizedActive);
+  if (
+    isBrandUser &&
+    item?.requiresStoreSetup &&
+    storeStatus?.isSetupComplete !== true &&
+    !needsPublishedStoreHours
+  ) {
+    return 'account-security';
+  }
+
+  return normalizedActive;
 }
 
 export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
@@ -272,8 +348,9 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   };
   const navigate = useNavigate();
   const me = useSelector((state: RootState) => state.user.profile);
-  const isBrandUser = hasActiveBrandMembership(me);
+  const isBrandUser = isBrandAccount(me);
   const isAdmin = me?.role === 'SuperAdmin' || me?.role === 'Admin';
+  const storeSetupComplete = useStoreSetupStatus();
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     for (const group of sidebarGroups) {
@@ -293,17 +370,11 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
     navigate(path);
   };
 
-  const visibleGroups = sidebarGroups
-    .filter((group) => !group.brandOnly || isBrandUser)
-    .map((group) => ({
-      ...group,
-      items: group.items.filter(
-        (item) =>
-          (!isAdmin || !item.nonAdmin) &&
-          // Shopper-only links never show for brand accounts, and vice-versa.
-          (!isBrandUser || !item.endUserOnly),
-      ),
-    }));
+  const visibleGroups = getVisibleSettingsGroups({
+    isBrandUser,
+    isAdmin,
+    storeSetupComplete,
+  });
 
   const renderGroup = (group: SidebarGroup) => {
     const isGroupActive = group.items.some((item) => item.key === active);

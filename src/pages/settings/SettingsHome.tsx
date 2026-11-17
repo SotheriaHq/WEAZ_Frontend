@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import SettingsSidebar, {
   getGroupForKey,
   getItemForKey,
+  resolveSettingsTab,
 } from '@/components/settings/SettingsSidebar';
 import PatchesSettings from '@/components/settings/tabs/PatchesSettings';
 import AccountSecuritySettings from '@/components/settings/tabs/AccountSecuritySettings';
@@ -24,7 +25,8 @@ import CurrencySettings from '@/components/settings/tabs/CurrencySettings';
 import SizeFitSettings from '@/components/settings/tabs/SizeFitSettings';
 import HiddenContentSettings from './HiddenContentSettings';
 import type { RootState } from '@/store';
-import { hasActiveBrandMembership, getActiveBrandId } from '@/lib/brandAccess';
+import { isBrandAccount, getActiveBrandId } from '@/lib/brandAccess';
+import { useStoreStatusQuery } from '@/query/queries';
 
 /* ── Coming Soon placeholder ─────────────────────────────────────── */
 const ComingSoon: React.FC<{ title: string; description: string }> = ({
@@ -270,18 +272,14 @@ const Breadcrumbs: React.FC<{
 const SettingsHome: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const me = useSelector((s: RootState) => s.user.profile);
-  const isBrandUser = hasActiveBrandMembership(me);
+  const isBrandUser = isBrandAccount(me);
+  const storeStatusQuery = useStoreStatusQuery({ enabled: isBrandUser });
   const active = searchParams.get('tab') || 'account';
-  const normalizedAccountTab =
-    active === 'account' || active === 'security' ? 'account-security' : active;
-  const normalizedActive =
-    isBrandUser && normalizedAccountTab === 'store-payments'
-      ? 'billing'
-      : normalizedAccountTab;
-  const resolvedActive =
-    !isBrandUser && normalizedActive.startsWith('store-')
-      ? 'account'
-      : normalizedActive;
+  const resolvedActive = resolveSettingsTab(
+    active,
+    isBrandUser,
+    storeStatusQuery.data ?? null,
+  );
   const resolvedSection =
     resolvedActive === 'subscription-billing' ? (
       <SubscriptionBillingSettings />
@@ -292,10 +290,10 @@ const SettingsHome: React.FC = () => {
     );
 
   useEffect(() => {
-    if (isBrandUser && active === 'store-payments') {
+    if (isBrandUser && active === 'store-payments' && resolvedActive === 'billing') {
       setSearchParams({ tab: 'billing' }, { replace: true });
     }
-  }, [active, isBrandUser, setSearchParams]);
+  }, [active, isBrandUser, resolvedActive, setSearchParams]);
 
   const setActive = (key: string) => {
     // Tab switches are UI state — replace so mobile back doesn't replay them.
