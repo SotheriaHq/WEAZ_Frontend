@@ -301,6 +301,14 @@ html {
 /* Unified Dark Theme - YouTube-style consistency */
 @layer base {
   :root {
+    /* ARU Brand Foundation — Compatibility Aliases */
+    --aru-brand-mark: var(--wiez-brand-mark);
+    --aru-brand-mark-ondark: var(--wiez-brand-mark-ondark);
+    --aru-brand-mark-strong: var(--wiez-brand-mark-strong);
+    --aru-brand-accent: var(--wiez-brand-accent);
+    --aru-ring: var(--wiez-ring);
+    --aru-ring-soft: var(--wiez-ring-soft);
+
     /* WIEZ Design Foundation — Semantic System (Wave 1) */
     --wiez-brand-mark: #6015e2;
     --wiez-brand-mark-ondark: #af87f4;
@@ -575,6 +583,14 @@ html {
   }
 
   .dark {
+    /* ARU Brand Foundation — Compatibility Aliases (Dark) */
+    --aru-brand-mark: var(--wiez-brand-mark);
+    --aru-brand-mark-ondark: var(--wiez-brand-mark-ondark);
+    --aru-brand-mark-strong: var(--wiez-brand-mark-strong);
+    --aru-brand-accent: var(--wiez-brand-accent);
+    --aru-ring: var(--wiez-ring);
+    --aru-ring-soft: var(--wiez-ring-soft);
+
     /* WIEZ Design Foundation — Semantic System (Wave 1 Dark) */
     --wiez-brand-mark: #af87f4;
     --wiez-brand-mark-ondark: #af87f4;

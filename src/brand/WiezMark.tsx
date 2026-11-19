@@ -57,5 +57,7 @@ const WiezMark: React.FC<WiezMarkProps> = ({ height = 132, className = '', title
 };
 
 export const WIEZ_MARK_ALT = LOGO_ACCESSIBILITY_LABEL;
+export const AruMark = WiezMark;
+export const ARU_MARK_ALT = LOGO_ACCESSIBILITY_LABEL;
 
 export default WiezMark;

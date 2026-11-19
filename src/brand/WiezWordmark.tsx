@@ -72,4 +72,6 @@ const WiezWordmark: React.FC<WiezWordmarkProps> = ({
   );
 };
 
+export const AruWordmark = WiezWordmark;
+
 export default WiezWordmark;
