@@ -120,18 +120,61 @@ describe('consent-gated third parties', () => {
     const next = await import('@/privacy/consent');
     expect(next.getConsentState().decided).toBe(true);
 
+    localStorage.clear();
     localStorage.setItem('wiez.consent', JSON.stringify({ version: 0, analytics: true }));
     vi.resetModules();
     const outdated = await import('@/privacy/consent');
     expect(outdated.getConsentState().decided).toBe(false);
     expect(outdated.isAllowed('analytics')).toBe(false);
 
+    localStorage.clear();
     const thirteenMonthsAgo = new Date(Date.now() - 395 * 24 * 60 * 60 * 1000).toISOString();
     localStorage.setItem('wiez.consent', JSON.stringify({ version: 1, decidedAt: thirteenMonthsAgo, analytics: true }));
     vi.resetModules();
     const expired = await import('@/privacy/consent');
     expect(expired.getConsentState().decided).toBe(false);
     expect(expired.analyticsPermitted()).toBe(false);
+  });
+
+  it('dual-reads legacy wiez.consent, migrates to aru.consent, and retires legacy without resetting user choice', async () => {
+    localStorage.clear();
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const legacyChoice = {
+      version: 1,
+      decidedAt: oneDayAgo,
+      analytics: true,
+      thirdPartySignIn: false,
+    };
+    localStorage.setItem('wiez.consent', JSON.stringify(legacyChoice));
+
+    vi.resetModules();
+    const consent = await import('@/privacy/consent');
+    const state = consent.getConsentState();
+    expect(state.decided).toBe(true);
+    expect(state.record?.analytics).toBe(true);
+    expect(state.record?.thirdPartySignIn).toBe(false);
+    expect(consent.isAllowed('analytics')).toBe(true);
+    expect(consent.isAllowed('thirdPartySignIn')).toBe(false);
+
+    // Verified opportunistic migration: aru.consent populated, wiez.consent retired
+    expect(localStorage.getItem('aru.consent')).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem('aru.consent')!)).toMatchObject({
+      version: 1,
+      analytics: true,
+      thirdPartySignIn: false,
+    });
+    expect(localStorage.getItem('wiez.consent')).toBeNull();
+
+    // Saving updates aru.consent and keeps wiez.consent cleared
+    consent.saveConsent(consent.OPTIONAL_OFF);
+    expect(JSON.parse(localStorage.getItem('aru.consent')!)).toMatchObject({
+      analytics: false,
+      thirdPartySignIn: false,
+    });
+    expect(localStorage.getItem('wiez.consent')).toBeNull();
+
+    localStorage.clear();
+    vi.resetModules();
   });
 });
 

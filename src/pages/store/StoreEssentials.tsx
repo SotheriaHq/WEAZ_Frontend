@@ -251,10 +251,17 @@ const StoreEssentials: React.FC = () => {
      * back another day is still greeted.
      */
     if (!user?.id) return;
-    const seenKey = `wiez.storeSetup.welcomed:${user.id}`;
+    const primarySeenKey = `aru.storeSetup.welcomed:${user.id}`;
+    const legacySeenKey = `wiez.storeSetup.welcomed:${user.id}`;
     try {
-      if (window.sessionStorage.getItem(seenKey)) return;
-      window.sessionStorage.setItem(seenKey, '1');
+      if (
+        window.sessionStorage.getItem(primarySeenKey) ||
+        window.sessionStorage.getItem(legacySeenKey)
+      ) {
+        return;
+      }
+      window.sessionStorage.setItem(primarySeenKey, '1');
+      window.sessionStorage.removeItem(legacySeenKey);
     } catch {
       // Storage unavailable (private mode, restricted WebView). Fall through and
       // celebrate — a duplicate confetti is a smaller failure than none at all.
