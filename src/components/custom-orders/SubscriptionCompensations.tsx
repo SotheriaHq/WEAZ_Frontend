@@ -42,7 +42,7 @@ export default function SubscriptionCompensations() {
   async function reconcile(capture: SubscriptionCapture) {
     const providerRefundId = providerIds[capture.id]?.trim() || capture.providerRefundId || undefined;
     if (!providerRefundId) { toast.error('Enter the existing provider refund ID to verify an unknown refund.'); return; }
-    if (!(await confirm({ title: 'Reconcile existing subscription refund?', message: 'WIEZ will verify the supplied provider refund against this capture, including its amount, currency and reference. This action does not submit a new refund. Use the existing refund ID from the payment provider.', confirmText: 'Verify existing refund' }))) return;
+    if (!(await confirm({ title: 'Reconcile existing subscription refund?', message: 'ARU will verify the supplied provider refund against this capture, including its amount, currency and reference. This action does not submit a new refund. Use the existing refund ID from the payment provider.', confirmText: 'Verify existing refund' }))) return;
     setBusyId(capture.id);
     try {
       await apiClient.post(`/admin/subscriptions/compensations/${capture.id}/reconcile`, { providerRefundId });

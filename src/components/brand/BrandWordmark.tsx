@@ -1,8 +1,8 @@
 import React from 'react';
 
+import AruMark from '@/brand/AruMark';
+import AruWordmark from '@/brand/AruWordmark';
 import { PRODUCT_NAME } from '@/brand/identity';
-import WiezMark from '@/brand/WiezMark';
-import WiezWordmark from '@/brand/WiezWordmark';
 
 /**
  * The brand lockup.
@@ -39,9 +39,9 @@ const BrandWordmark: React.FC<BrandWordmarkProps> = ({
 }) => (
   <span className={`inline-flex items-center ${className}`.trim()}>
     {showName ? (
-      <WiezWordmark height={logoSize} className={logoClassName} />
+      <AruWordmark height={logoSize} className={logoClassName} />
     ) : (
-      <WiezMark height={logoSize} className={logoClassName} title={PRODUCT_NAME} />
+      <AruMark height={logoSize} className={logoClassName} title={PRODUCT_NAME} />
     )}
   </span>
 );

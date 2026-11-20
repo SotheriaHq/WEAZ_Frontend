@@ -2139,13 +2139,13 @@ const ProfilePage: React.FC = () => {
   ]);
 
   const handleShareProfile = useCallback(async () => {
-    const shareBrandName = viewDisplayData.brandName || 'WIEZ';
+    const shareBrandName = viewDisplayData.brandName || 'ARU';
     const url = profileShareUrl;
     if (!url) {
       toast.error('Profile link is not available yet.');
       return;
     }
-    const message = `Check out ${shareBrandName} on WIEZ: ${url}`;
+    const message = `Check out ${shareBrandName} on ARU: ${url}`;
     try {
       if (navigator.share) {
         await navigator.share({
@@ -2357,7 +2357,7 @@ const ProfilePage: React.FC = () => {
       <BrandQrModal
         open={isBrandQrOpen}
         onClose={() => setIsBrandQrOpen(false)}
-        brandName={viewDisplayData.brandName || 'WIEZ Brand'}
+        brandName={viewDisplayData.brandName || 'ARU Brand'}
         qrTargetUrl={profileQrTargetUrl}
         shareUrl={profileShareUrl}
         logoUrl={viewDisplayData.logoImage ?? null}

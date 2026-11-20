@@ -318,7 +318,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     {customCardEntryEnabled
                       ? 'Enter the card details below. It can be saved for faster reuse.'
-                      : 'WIEZ will prepare Paystack checkout and you will enter card details there.'}
+                      : 'ARU will prepare Paystack checkout and you will enter card details there.'}
                   </p>
                 </div>
                 <span className="text-lg" aria-hidden>
@@ -397,7 +397,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
 
                 <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 px-3 py-3 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
                   🔒 Card details are sent only for payment authorization and are never stored on
-                  WIEZ servers. Your bank can still open a secure Paystack window for PIN, OTP, or
+                  ARU servers. Your bank can still open a secure Paystack window for PIN, OTP, or
                   3-D Secure verification after you continue.
                 </div>
               </div>
@@ -418,7 +418,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
                 </label>
 
                 <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/70 px-3 py-3 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
-                  WIEZ will prepare Paystack secure checkout inside this flow. Enter card number,
+                  ARU will prepare Paystack secure checkout inside this flow. Enter card number,
                   expiry, CVV, PIN, or OTP only inside the secure payment window that opens next.
                 </div>
 
@@ -477,7 +477,7 @@ const PaymentDetailsSection: React.FC<PaymentDetailsSectionProps> = ({
           issuer verification, provider challenges, or delayed confirmation before the order is
           fulfilled.{' '}
           {customCardEntryEnabled
-            ? 'New card details are sent securely to the payment provider for authorization and are never stored on WIEZ servers.'
+            ? 'New card details are sent securely to the payment provider for authorization and are never stored on ARU servers.'
             : 'If I add a new card, the details will be entered only inside the secure Paystack checkout window.'}
           {errors.consentAccepted ? (
             <span className="mt-1 block text-xs text-red-500">{errors.consentAccepted}</span>

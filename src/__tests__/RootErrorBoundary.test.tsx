@@ -46,7 +46,7 @@ describe('RootErrorBoundary', () => {
     render(<RootErrorBoundary><Throws error={chunkError()} /></RootErrorBoundary>);
 
     expect(screen.getByText("You're offline")).toBeTruthy();
-    expect(screen.queryByText('WIEZ could not start')).toBeNull();
+    expect(screen.queryByText('ARU could not start')).toBeNull();
     expect(screen.queryByText(/dynamically imported module/)).toBeNull();
     expect(captureClientException).not.toHaveBeenCalled();
   });
@@ -65,7 +65,7 @@ describe('RootErrorBoundary', () => {
     setOnline(false);
     render(<RootErrorBoundary><Throws error={new Error('Store failed to hydrate')} /></RootErrorBoundary>);
 
-    expect(screen.getByText('WIEZ could not start')).toBeTruthy();
+    expect(screen.getByText('ARU could not start')).toBeTruthy();
     expect(captureClientException).toHaveBeenCalledTimes(1);
   });
 

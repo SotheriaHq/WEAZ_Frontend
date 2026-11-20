@@ -4,7 +4,7 @@ import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
  * and child; no credential, MFA proof or access grant crosses this bridge. */
 export function requestPhoneSessionVerification(parentSessionId: string, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (!window.ReactNativeWebView) { reject(new Error('Open WIEZ on the flagged phone, verify its session, then retry here.')); return; }
+    if (!window.ReactNativeWebView) { reject(new Error('Open ARU on the flagged phone, verify its session, then retry here.')); return; }
     if (signal.aborted) { reject(new Error('Verification cancelled.')); return; }
     const requestId = crypto.randomUUID();
     const finish = (error?: Error) => {

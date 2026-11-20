@@ -559,7 +559,7 @@ export function getPaymentSummaryLines(
       ? ` (${paymentData.savedCardDisplay.bank})`
       : '';
     lines.push(`${brand}${bank} ending ${paymentData.savedCardDisplay.last4}`);
-    lines.push('WIEZ will verify the saved-card authorization after you continue');
+    lines.push('ARU will verify the saved-card authorization after you continue');
   } else {
     lines[lines.length - 1] = 'Card checkout';
     if (hasRawCardDraft(paymentData)) {

@@ -217,7 +217,7 @@ const SecuritySettings: React.FC = () => {
 
         {embedded ? (
           <div className="space-y-4">
-            <p>Change your password in the WIEZ app to keep this phone signed in securely. Other sessions, including Studio, will close after the change.</p>
+            <p>Change your password in the ARU app to keep this phone signed in securely. Other sessions, including Studio, will close after the change.</p>
             <Button type="button" onClick={() => postStudioNativeEvent({
               type: 'OPEN_NATIVE_ROUTE', path: '/settings/account-security',
             })}>Open Password &amp; security</Button>

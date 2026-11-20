@@ -51,8 +51,8 @@ export function selectBuyerAdminNotices(
         createdAt: event.createdAt,
         title:
           type === 'ADMIN_INTERVENTION_RESOLVED'
-            ? '✅ WIEZ closed its review'
-            : '📣 A note from WIEZ',
+            ? '✅ ARU closed its review'
+            : '📣 A note from ARU',
         body: note.length > 0 ? note : null,
       };
     })
@@ -85,12 +85,12 @@ export const AdminNoticePanel: React.FC<{
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-base font-bold text-amber-950 dark:text-amber-50">
-            {interventionOpen ? 'WIEZ is reviewing this order' : 'Notes from WIEZ'}
+            {interventionOpen ? 'ARU is reviewing this order' : 'Notes from ARU'}
           </h3>
           <p className="mt-1 text-[13px] text-amber-900/80 dark:text-amber-100/80">
             {interventionOpen
-              ? 'Someone at WIEZ is working on this with the maker. You will hear from us here.'
-              : 'Updates from WIEZ about this order. You do not need to reply.'}
+              ? 'Someone at ARU is working on this with the maker. You will hear from us here.'
+              : 'Updates from ARU about this order. You do not need to reply.'}
             {interventionReason
               ? ` Reason: ${humanizeCustomOrderToken(interventionReason).toLowerCase()}.`
               : ''}

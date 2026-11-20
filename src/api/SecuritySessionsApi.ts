@@ -30,7 +30,7 @@ function page<T>(payload: unknown, valid: (item: unknown) => boolean): SecurityP
   if (!result || !Array.isArray(result.items) || result.items.length > 100 ||
     result.items.some(item => !valid(item)) ||
     !(result.nextCursor === null || (typeof result.nextCursor === 'string' && result.nextCursor.length > 0 && result.nextCursor.length <= 512)))
-    throw new Error('WIEZ returned incomplete device sessions. Please retry.');
+    throw new Error('ARU returned incomplete device sessions. Please retry.');
   return result;
 }
 const record = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';

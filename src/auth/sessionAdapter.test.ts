@@ -152,7 +152,7 @@ describe('WebSessionStorageAdapter — AUTH-T01 through AUTH-T08 Contract Suite'
       localStorage.setItem('WIEZ_ACCESS_TOKEN', 'tok-legacy-precious');
       const originalGetItem = localStorage.getItem.bind(localStorage);
       let setCalled = false;
-      vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, val) => {
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key) => {
         if (key === WebSessionStorageAdapter.PRIMARY_TOKEN_KEY) setCalled = true;
       });
       vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => {

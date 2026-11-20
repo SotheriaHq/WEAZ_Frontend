@@ -11,7 +11,7 @@ type BrandSettlementNoteFlagProps = {
 };
 
 const NOTE_COPY =
-  'Customer payments are recorded gross. WIEZ retains platform commission, and your net balance releases into payouts as each order milestone is completed.';
+  'Customer payments are recorded gross. ARU retains platform commission, and your net balance releases into payouts as each order milestone is completed.';
 
 const BrandSettlementNoteFlag: React.FC<BrandSettlementNoteFlagProps> = ({
   userId,

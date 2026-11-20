@@ -46,7 +46,7 @@ it('reports a terminal startup failure to the native loader without exposing err
   const Throws = () => { throw new Error('Sensitive startup details'); };
   try {
     render(<RootErrorBoundary><Throws /></RootErrorBoundary>);
-    expect(screen.getByText('WIEZ could not start')).toBeInTheDocument();
+    expect(screen.getByText('ARU could not start')).toBeInTheDocument();
     expect(postMessage).toHaveBeenCalledWith(JSON.stringify({ type: 'BOOT_FAILED' }));
     expect(postMessage.mock.calls.flat().join(' ')).not.toContain('Sensitive startup details');
   } finally {

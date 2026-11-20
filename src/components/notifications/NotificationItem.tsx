@@ -187,7 +187,7 @@ export const NotificationItem = React.memo<NotificationItemProps>(
           className={`avatar-section ${hasActor ? 'clickable' : 'non-clickable'}`}
           onClick={hasActor ? handleAvatarClick : undefined}
           role={hasActor ? 'button' : 'img'}
-          aria-label={hasActor ? `View profile of ${displayName}` : 'WIEZ notification'}
+          aria-label={hasActor ? `View profile of ${displayName}` : 'ARU notification'}
           tabIndex={hasActor ? 0 : -1}
           data-testid="notification-avatar"
         >

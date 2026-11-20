@@ -257,7 +257,7 @@ export function hasValidTarget(notification: NormalizedNotification): boolean {
 }
 
 /**
- * Gets display name for actor with fallback to WIEZ for system events
+ * Gets display name for actor with fallback to ARU for system events
  */
 export function getActorDisplayName(notification: NormalizedNotification): string {
     if (!notification.actor) {
@@ -276,7 +276,7 @@ export function getActorDisplayName(notification: NormalizedNotification): strin
             }
         }
 
-        return 'WIEZ';
+        return 'ARU';
     }
 
     if (notification.actor.username) {

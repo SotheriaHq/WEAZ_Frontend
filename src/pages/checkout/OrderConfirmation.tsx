@@ -131,7 +131,7 @@ const OrderConfirmation: React.FC = () => {
     if (!reference) return;
 
     setResumingPayment(true);
-    setPaymentActionMessage('Opening secure checkout inside WIEZ...');
+    setPaymentActionMessage('Opening secure checkout inside ARU...');
     try {
       const resolvedGateway = resolvePaymentGateway({
         gateway: locationState?.gateway ?? attempt?.gateway,
@@ -181,7 +181,7 @@ const OrderConfirmation: React.FC = () => {
       });
     } catch (error: any) {
       setPaymentActionMessage(
-        'This payment can only continue from a secure in-app session. Retry the payment from inside WIEZ.',
+        'This payment can only continue from a secure in-app session. Retry the payment from inside ARU.',
       );
       toast.error(error?.message || 'Unable to resume payment');
     } finally {
@@ -199,7 +199,7 @@ const OrderConfirmation: React.FC = () => {
       <QueuePaymentOutcome customOrderIds={attempt?.customOrderIds ?? []} />
         <div className="mb-6 text-6xl">🧾</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Loading payment confirmation</h1>
-        <p className="text-gray-500 dark:text-zinc-400">WIEZ is loading the latest payment and order state.</p>
+        <p className="text-gray-500 dark:text-zinc-400">ARU is loading the latest payment and order state.</p>
       </div>
     );
   }

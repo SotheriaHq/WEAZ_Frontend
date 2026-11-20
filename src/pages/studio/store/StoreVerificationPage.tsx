@@ -346,7 +346,7 @@ export default function StoreVerificationPage() {
               {currentStep === 4
                 ? 'Step 4 of 4 — Badge is Active 🎉'
                 : currentStep === 3
-                  ? 'Step 3 of 4 — Under WIEZ Review'
+                  ? 'Step 3 of 4 — Under ARU Review'
                   : 'Step 2 of 4 — Identity & Evidence Submission'}
             </h2>
           </div>
@@ -569,7 +569,7 @@ export default function StoreVerificationPage() {
               <p className="mt-2 text-xs text-on-surface-variant max-w-xs">
                 {status?.badgeState.isVerifiedBrand
                   ? 'Your trust badge is displayed across storefronts, catalog items, and brand cards.'
-                  : 'Complete verification to earn your official WIEZ verification badge.'}
+                  : 'Complete verification to earn your official ARU verification badge.'}
               </p>
             </div>
 

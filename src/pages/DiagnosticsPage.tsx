@@ -72,7 +72,7 @@ const DiagnosticsPage: React.FC = () => {
     }
     try {
       await navigator.share({
-        title: 'WIEZ diagnostics',
+        title: 'ARU diagnostics',
         text,
       });
     } catch {

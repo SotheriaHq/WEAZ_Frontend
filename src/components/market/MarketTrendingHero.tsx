@@ -198,7 +198,7 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
           id="market-trending-heading"
           className="mt-1 font-serif text-2xl tracking-tight text-gray-900 dark:text-white sm:text-3xl lg:text-4xl"
         >
-          Trending now on <span className="font-normal italic">WIEZ</span>
+          Trending now on <span className="font-normal italic">ARU</span>
         </h2>
       </div>
 
@@ -273,7 +273,7 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
           {/* Card Body & Information */}
           <div className="relative z-10 p-5 sm:p-7 pt-24 sm:pt-32">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-purple-200/90">
-              {active.brand?.name ? `${active.brand.name.toUpperCase()} STUDIO` : 'WIEZ MASTER ATELIER'}
+              {active.brand?.name ? `${active.brand.name.toUpperCase()} STUDIO` : 'ARU MASTER ATELIER'}
               <span className="text-white/40"> • </span>
               <span>LAGOS & PARIS</span>
             </p>
@@ -395,7 +395,7 @@ export const MarketTrendingHero: React.FC<MarketTrendingHeroProps> = ({
                     {/* Meta Details */}
                     <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
                       <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400 break-words [overflow-wrap:anywhere]">
-                        {product.brand?.name || 'WIEZ ATELIER'}
+                        {product.brand?.name || 'ARU ATELIER'}
                       </p>
                       <h4 className="font-serif text-sm font-semibold leading-snug text-gray-900 dark:text-white break-words group-hover:text-purple-600 dark:group-hover:text-purple-400">
                         {product.name}

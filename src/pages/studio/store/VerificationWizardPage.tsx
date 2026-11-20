@@ -201,7 +201,7 @@ function VerificationWizardContent() {
       status.verificationStatus === 'PENDING' ||
       status.verificationStatus === 'IN_REVIEW'
     ) {
-      return 'This attempt is already in the review queue. The wizard unlocks again only if WIEZ requests more information or a new attempt becomes available.';
+      return 'This attempt is already in the review queue. The wizard unlocks again only if ARU requests more information or a new attempt becomes available.';
     }
     if (
       status.verificationStatus === 'REJECTED' &&
@@ -780,7 +780,7 @@ function VerificationWizardContent() {
       {!wizardLockMessage && infoRequestedItems.length > 0 ? (
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm shrink-0 dark:border-amber-500/30 dark:bg-amber-500/10">
           <p className="text-xs font-bold uppercase tracking-widest text-amber-800 dark:text-amber-200">
-            📌 WIEZ asked for updates
+            📌 ARU asked for updates
           </p>
           {status?.infoRequestMessage ? (
             <p className="mt-1.5 text-xs leading-relaxed text-amber-900 dark:text-amber-100">
@@ -1533,7 +1533,7 @@ function VerificationWizardContent() {
               💳 Refunds and your balance
             </p>
             <p className="text-xs leading-relaxed text-amber-900/90 dark:text-amber-100/90">
-              WIEZ refunds a shopper immediately when one is owed — they never
+              ARU refunds a shopper immediately when one is owed — they never
               wait for you to be in funds. Where that order had already been
               released to you, the amount becomes a balance you owe: your account
               can go negative, payouts pause until it clears, and we recover it

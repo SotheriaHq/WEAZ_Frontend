@@ -233,7 +233,7 @@ const SettingsPage: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 label="Brand Name"
-                placeholder="e.g. WIEZ Fashion"
+                placeholder="e.g. ARU Fashion"
                 {...register('brandFullName')}
               />
               <Input

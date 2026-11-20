@@ -119,7 +119,7 @@ describe('OrderDetail', () => {
   it.each([
     ['PROCESSING', 'Refund processing', 'Bank credit is not yet confirmed'],
     ['SETTLED', 'Refund processed by the payment provider', 'additional time'],
-    ['NEEDS_ATTENTION', 'Refund needs WIEZ attention', 'request remains recorded'],
+    ['NEEDS_ATTENTION', 'Refund needs ARU attention', 'request remains recorded'],
   ])('shows %s from the current refund record', async (status, title, message) => {
     getMyOrder.mockResolvedValue({ id: 'order-1', status: 'CANCELLED', paymentStatus: 'PAID', totalAmount: 15000, currency: 'NGN', items: [], orderItems: [], createdAt: '2026-10-28T10:00:00Z', financeBreakdown: { refund: { status } } });
     showOrder();

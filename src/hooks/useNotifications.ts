@@ -171,7 +171,7 @@ export function useNotificationsBootstrap() {
       if (messagingPrefsRef.current.desktop && notVisible && 'Notification' in window) {
         if (Notification.permission === 'granted') {
           const desktopNotification = new Notification(
-            isMessageSignal ? 'WIEZ message' : 'WIEZ',
+            isMessageSignal ? 'ARU message' : 'ARU',
             {
               body:
                 payload.message ||

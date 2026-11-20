@@ -30,7 +30,7 @@ import { useEmbeddedSurface } from '@/hooks/useEmbeddedSurface';
 import { postStudioNativeEvent } from '@/utils/studioNativeBridge';
 import { getStudioProductsPage } from '@/api/StudioStoreApi';
 import { resolveAccountDisplayName } from '@/lib/brandAccess';
-import WiezMark from '@/brand/WiezMark';
+import AruMark from '@/brand/AruMark';
 
 export default function StoreManagement() {
   const commerce = useBrandCommerceAccess();
@@ -167,7 +167,7 @@ export default function StoreManagement() {
     resolvedAvatar.fileId,
     resolvedAvatar.src,
   );
-  // avatarFallback replaced with WiezMark fallback logo
+  // avatarFallback replaced with AruMark fallback logo
 
   const brandName = useMemo(() => {
     if (status?.profile?.name) return status.profile.name;
@@ -613,7 +613,7 @@ export default function StoreManagement() {
                       mediaClassName="h-full w-full object-cover"
                     />
                   ) : (
-                    <WiezMark height={32} />
+                    <AruMark height={32} />
                   )}
                 </div>
                 <div>

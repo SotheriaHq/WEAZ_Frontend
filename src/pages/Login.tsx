@@ -1185,7 +1185,7 @@ const LoginPage = () => {
                     <div>
                       <p className="text-sm font-medium auth-heading">Create your password</p>
                       <p className="mt-1 text-xs auth-muted">
-                        This creates your first WIEZ password. You will sign in after it is saved.
+                        This creates your first ARU password. You will sign in after it is saved.
                       </p>
                     </div>
                     <input

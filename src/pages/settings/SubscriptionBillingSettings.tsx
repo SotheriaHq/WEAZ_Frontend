@@ -176,7 +176,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
         const result = await brandSubscriptionApi.verify(brandId, reference);
         setVerificationMessage(
           ['PAID', 'SUCCESS', 'ACTIVE'].includes(result.status?.toUpperCase())
-            ? 'Payment verified. Your subscription has been refreshed from WIEZ.'
+            ? 'Payment verified. Your subscription has been refreshed from ARU.'
             : `Payment status: ${result.status}. Your existing entitlement is preserved until the payment is confirmed.`,
         );
         await refetchBilling();
@@ -608,7 +608,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
                     </span>
                   </div>
                   <SettingsSectionHeading className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white">
-                    WIEZ Creative Free Plan
+                    ARU Creative Free Plan
                   </SettingsSectionHeading>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     Essential creative pipeline for independent designers & ateliers.
@@ -850,7 +850,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
                 Detailed Tier Comparison
               </SettingsSectionHeading>
               <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                Understand full capacity and queue privileges across all four WIEZ tiers.
+                Understand full capacity and queue privileges across all four ARU tiers.
               </p>
             </div>
 
@@ -1065,7 +1065,7 @@ function BrandSubscriptionContent({ isGuestView: _isGuestView = false }: { isGue
           </p>
           <p role="status" className="text-xs sm:text-sm font-semibold text-purple-900 dark:text-purple-200">
             {verificationMessage ||
-              'Checking the payment status from WIEZ server. Do not start another checkout.'}
+              'Checking the payment status from ARU server. Do not start another checkout.'}
           </p>
           <div className="flex items-center gap-2">
             <Button

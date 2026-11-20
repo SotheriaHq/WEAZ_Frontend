@@ -57,7 +57,7 @@ const COPY: Record<
 > = {
   PAYOUT_ACCOUNT_MISSING: {
     title: 'Add a payout account',
-    message: 'WIEZ needs to know which bank account to pay you into before it can release a payout.',
+    message: 'ARU needs to know which bank account to pay you into before it can release a payout.',
     ctaLabel: 'Add payout account',
   },
   PAYOUT_ACCOUNT_INACTIVE: {
@@ -68,7 +68,7 @@ const COPY: Record<
   PAYOUT_RECIPIENT_INACTIVE: {
     title: 'Verify your bank account',
     message:
-      'WIEZ can’t send your payout until your bank account is verified. Confirm your bank and account number, and WIEZ will check them with your bank.',
+      'ARU can’t send your payout until your bank account is verified. Confirm your bank and account number, and ARU will check them with your bank.',
     ctaLabel: 'Verify bank account',
   },
 };

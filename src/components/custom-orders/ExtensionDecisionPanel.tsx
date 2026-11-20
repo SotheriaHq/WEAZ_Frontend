@@ -71,7 +71,7 @@ const statusExplanation = (request: CustomOrderExtensionRequest): string => {
     case 'ACCEPTED':
       return `You granted ${days} extra day${days === 1 ? '' : 's'}.`;
     case 'REJECTED':
-      return 'You declined. WIEZ reviewed the order with the maker.';
+      return 'You declined. ARU reviewed the order with the maker.';
     case 'COUNTERED':
       return request.buyerCounterDays
         ? `You offered ${request.buyerCounterDays} day${request.buyerCounterDays === 1 ? '' : 's'} instead.`
@@ -239,7 +239,7 @@ export const ExtensionDecisionPanel: React.FC<{
         Accepting moves the delivery date by{' '}
         {request.requestedExtraDays} day
         {request.requestedExtraDays === 1 ? '' : 's'}. Declining does not cancel
-        your order or refund it — it brings WIEZ in to resolve the delay with the
+        your order or refund it — it brings ARU in to resolve the delay with the
         maker. Either way you can add a note.
       </p>
 
@@ -288,7 +288,7 @@ export const ExtensionDecisionPanel: React.FC<{
             <p className="mt-1.5 text-[13px] text-gray-600 dark:text-gray-300">
               {decision === 'ACCEPTED'
                 ? 'Your delivery date moves and the maker carries on.'
-                : 'Your order stays live. WIEZ steps in to sort the delay out with the maker, and will be in touch.'}
+                : 'Your order stays live. ARU steps in to sort the delay out with the maker, and will be in touch.'}
             </p>
 
             <label
@@ -306,7 +306,7 @@ export const ExtensionDecisionPanel: React.FC<{
               placeholder={
                 decision === 'ACCEPTED'
                   ? 'Anything you want the maker to know'
-                  : 'Anything WIEZ should know about the delay'
+                  : 'Anything ARU should know about the delay'
               }
               className="mt-1.5 w-full rounded-2xl border border-black/10 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-white/10 dark:bg-slate-900 dark:text-white"
             />
