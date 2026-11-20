@@ -25,6 +25,7 @@ import { queryKeys } from '@/query/queryKeys';
 import { clearWebPrivateSessionState } from '@/auth/sessionCleanup';
 import { SecurityVerificationCancelled } from '@/auth/securityChallenge';
 import { isStudioHandoffInFlight } from '@/auth/studioHandoffAuthority';
+import { WebSessionStorageAdapter } from '@/auth/sessionAdapter';
 
 interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
@@ -56,8 +57,12 @@ const hasPersistedSessionEvidence = () => {
   }
   try {
     return Boolean(
+      WebSessionStorageAdapter.getAccessToken() ||
+      WebSessionStorageAdapter.getUserProfile() ||
       localStorage.getItem(env.tokenStorageKey) ||
-        localStorage.getItem(env.userStorageKey),
+      localStorage.getItem(env.userStorageKey) ||
+      localStorage.getItem('WIEZ_ACCESS_TOKEN') ||
+      localStorage.getItem('WIEZ_USER'),
     );
   } catch {
     return false;
@@ -106,7 +111,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Keep auth/profile as the canonical server snapshot.
     try {
-      const raw = typeof window !== 'undefined' ? localStorage.getItem(env.userStorageKey) : null;
+      const raw = typeof window !== 'undefined'
+        ? (WebSessionStorageAdapter.getUserProfile() ?? localStorage.getItem(env.userStorageKey))
+        : null;
       if (raw) {
         const persisted = JSON.parse(raw) as AuthUserDto;
         // Only overwrite server values when server doesn't provide them and persisted has them
@@ -200,7 +207,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const onUserStorage = (event: StorageEvent) => {
       if (event.storageArea !== localStorage) return;
-      if (event.key !== env.userStorageKey) return;
+      if (
+        event.key !== env.userStorageKey &&
+        event.key !== WebSessionStorageAdapter.PRIMARY_USER_KEY &&
+        !WebSessionStorageAdapter.LEGACY_USER_KEYS.includes(event.key ?? '')
+      ) return;
 
       // A storage event is a signal, never proof of identity. Drop this tab's
       // old credentials/private state, then ask the server about its cookies.

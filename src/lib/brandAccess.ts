@@ -4,7 +4,9 @@ import type {
   BrandMemberRole,
 } from '@/types/auth';
 
-export const ACTIVE_BRAND_STORAGE_KEY = 'wiez.activeBrandId';
+export const ARU_ACTIVE_BRAND_STORAGE_KEY = 'aru.activeBrandId';
+export const LEGACY_ACTIVE_BRAND_STORAGE_KEY = 'wiez.activeBrandId';
+export const ACTIVE_BRAND_STORAGE_KEY = ARU_ACTIVE_BRAND_STORAGE_KEY;
 
 const ACTIVE_STATUS = 'ACTIVE';
 
@@ -40,8 +42,20 @@ const PAYOUTS_READ_ROLES = new Set<BrandMemberRole>(['OWNER']);
 const readStoredActiveBrandId = (): string | null => {
   if (typeof window === 'undefined') return null;
   try {
-    const value = window.localStorage.getItem(ACTIVE_BRAND_STORAGE_KEY);
-    return value && value.trim().length > 0 ? value : null;
+    const primary = window.localStorage.getItem(ARU_ACTIVE_BRAND_STORAGE_KEY);
+    if (primary && primary.trim().length > 0) return primary;
+
+    const legacy = window.localStorage.getItem(LEGACY_ACTIVE_BRAND_STORAGE_KEY);
+    if (legacy && legacy.trim().length > 0) {
+      try {
+        window.localStorage.setItem(ARU_ACTIVE_BRAND_STORAGE_KEY, legacy);
+        window.localStorage.removeItem(LEGACY_ACTIVE_BRAND_STORAGE_KEY);
+      } catch {
+        // Migration best effort
+      }
+      return legacy;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -51,9 +65,15 @@ export const setStoredActiveBrandId = (brandId: string | null): void => {
   if (typeof window === 'undefined') return;
   try {
     if (brandId) {
-      window.localStorage.setItem(ACTIVE_BRAND_STORAGE_KEY, brandId);
+      window.localStorage.setItem(ARU_ACTIVE_BRAND_STORAGE_KEY, brandId);
+      try {
+        window.localStorage.removeItem(LEGACY_ACTIVE_BRAND_STORAGE_KEY);
+      } catch {
+        // Best effort
+      }
     } else {
-      window.localStorage.removeItem(ACTIVE_BRAND_STORAGE_KEY);
+      window.localStorage.removeItem(ARU_ACTIVE_BRAND_STORAGE_KEY);
+      window.localStorage.removeItem(LEGACY_ACTIVE_BRAND_STORAGE_KEY);
     }
   } catch {
     // Storage availability must not block auth rendering.

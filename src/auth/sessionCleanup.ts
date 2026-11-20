@@ -4,11 +4,12 @@ import { brandApi } from '@/api/BrandApi';
 import { dropStoredAccessToken } from '@/api/httpClient';
 import { env } from '@/config/env';
 import { clearSignedFileUrlSessionCache } from '@/hooks/useSignedFileUrl';
-import { ACTIVE_BRAND_STORAGE_KEY } from '@/lib/brandAccess';
+import { ACTIVE_BRAND_STORAGE_KEY, ARU_ACTIVE_BRAND_STORAGE_KEY, LEGACY_ACTIVE_BRAND_STORAGE_KEY } from '@/lib/brandAccess';
 import { disconnectSocket } from '@/lib/ws';
-import { purgeWebPersistedQueryCache, WIEZ_QUERY_CACHE_STORAGE_KEY } from '@/query/queryPersistor';
+import { purgeWebPersistedQueryCache, ARU_QUERY_CACHE_STORAGE_KEY, WIEZ_QUERY_CACHE_STORAGE_KEY } from '@/query/queryPersistor';
 import { PRIVATE_QUERY_ROOTS } from '@/query/queryKeys';
 import { clearWebMarketSignalQueue } from '@/services/marketSignalQueue';
+import { WebSessionStorageAdapter } from '@/auth/sessionAdapter';
 
 const SIGNED_URL_SESSION_STORAGE_KEY = 'wiez_signed_url_cache';
 const PENDING_BAG_ACTION_SESSION_STORAGE_KEY = 'wiez.pendingBagAction.v1';
@@ -72,7 +73,13 @@ export const clearWebPrivateCaches = (client?: QueryClient) => {
   clearSignedFileUrlSessionCache();
   clearWebMarketSignalQueue();
 
-  removeLocalStorageKeys([ACTIVE_BRAND_STORAGE_KEY, WIEZ_QUERY_CACHE_STORAGE_KEY]);
+  removeLocalStorageKeys([
+    ARU_ACTIVE_BRAND_STORAGE_KEY,
+    LEGACY_ACTIVE_BRAND_STORAGE_KEY,
+    ACTIVE_BRAND_STORAGE_KEY,
+    ARU_QUERY_CACHE_STORAGE_KEY,
+    WIEZ_QUERY_CACHE_STORAGE_KEY,
+  ]);
   removeSessionStorageKeys([
     SIGNED_URL_SESSION_STORAGE_KEY,
     PENDING_BAG_ACTION_SESSION_STORAGE_KEY,
@@ -84,7 +91,7 @@ export const clearWebPrivateCaches = (client?: QueryClient) => {
 export const readStoredWebUserId = (): string | null => {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem(env.userStorageKey);
+    const raw = WebSessionStorageAdapter.getUserProfile() ?? window.localStorage.getItem(env.userStorageKey);
     if (!raw) return null;
     const id = (JSON.parse(raw) as { id?: unknown } | null)?.id;
     return typeof id === 'string' && id.trim() ? id : null;
@@ -103,6 +110,8 @@ export const clearWebPrivateSessionState = async ({
   dropStoredAccessToken();
   clearWebPrivateCaches(client);
   clearWebRealtimeSession();
-  if (!preserveSharedAuthStorage)
+  if (!preserveSharedAuthStorage) {
+    WebSessionStorageAdapter.clearSession();
     removeLocalStorageKeys([env.tokenStorageKey, env.userStorageKey]);
+  }
 };
