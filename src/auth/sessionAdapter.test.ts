@@ -115,4 +115,74 @@ describe('WebSessionStorageAdapter — AUTH-T01 through AUTH-T08 Contract Suite'
     expect(oldBinaryToken).toBeNull();
     // Evaluates to clean null; user can log in without replay errors or app crash
   });
+
+  describe('Extended Precedence & Security Durability Scenarios (Section 4)', () => {
+    it('Dual-key precedence: matching credentials returns ARU primary', () => {
+      localStorage.setItem(WebSessionStorageAdapter.PRIMARY_TOKEN_KEY, 'tok-matched');
+      localStorage.setItem('WIEZ_ACCESS_TOKEN', 'tok-matched');
+      const token = WebSessionStorageAdapter.getAccessToken();
+      expect(token).toBe('tok-matched');
+    });
+
+    it('Dual-key precedence: conflicting credentials returns ARU primary (ARU precedence)', () => {
+      localStorage.setItem(WebSessionStorageAdapter.PRIMARY_TOKEN_KEY, 'tok-aru-fresh');
+      localStorage.setItem('WIEZ_ACCESS_TOKEN', 'tok-wiez-stale');
+      const token = WebSessionStorageAdapter.getAccessToken();
+      expect(token).toBe('tok-aru-fresh');
+    });
+
+    it('Dual-key precedence: invalid primary user profile drops invalid ARU and recovers valid legacy', () => {
+      localStorage.setItem(WebSessionStorageAdapter.PRIMARY_USER_KEY, '{not-valid-json');
+      localStorage.setItem('WIEZ_USER', JSON.stringify({ id: 'user-legacy-recovered' }));
+      const user = WebSessionStorageAdapter.getUserProfile();
+      expect(user).toBe(JSON.stringify({ id: 'user-legacy-recovered' }));
+      expect(localStorage.getItem(WebSessionStorageAdapter.PRIMARY_USER_KEY)).toBe(
+        JSON.stringify({ id: 'user-legacy-recovered' }),
+      );
+    });
+
+    it('Dual-key precedence: valid primary user profile ignores corrupt legacy key', () => {
+      localStorage.setItem(WebSessionStorageAdapter.PRIMARY_USER_KEY, JSON.stringify({ id: 'user-aru-valid' }));
+      localStorage.setItem('WIEZ_USER', '{corrupt-legacy-data');
+      const user = WebSessionStorageAdapter.getUserProfile();
+      expect(user).toBe(JSON.stringify({ id: 'user-aru-valid' }));
+    });
+
+    it('Read-back verification failure: prevents legacy key deletion', () => {
+      localStorage.setItem('WIEZ_ACCESS_TOKEN', 'tok-legacy-precious');
+      const originalGetItem = localStorage.getItem.bind(localStorage);
+      let setCalled = false;
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, val) => {
+        if (key === WebSessionStorageAdapter.PRIMARY_TOKEN_KEY) setCalled = true;
+      });
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => {
+        if (key === WebSessionStorageAdapter.PRIMARY_TOKEN_KEY && setCalled) {
+          return 'corrupted-readback-mismatch';
+        }
+        return originalGetItem(key);
+      });
+
+      const token = WebSessionStorageAdapter.getAccessToken();
+      expect(token).toBe('tok-legacy-precious');
+      expect(localStorage.getItem('WIEZ_ACCESS_TOKEN')).toBe('tok-legacy-precious');
+    });
+
+    it('Credential confidentiality: tokens and secrets are never logged in console or errors', () => {
+      const sensitiveToken = 'sensitive-secret-token-xyz-987';
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      WebSessionStorageAdapter.setAccessToken(sensitiveToken);
+      WebSessionStorageAdapter.getAccessToken();
+
+      const allLoggedMessages = [
+        ...logSpy.mock.calls.flat(),
+        ...warnSpy.mock.calls.flat(),
+        ...errorSpy.mock.calls.flat(),
+      ].join(' ');
+
+      expect(allLoggedMessages).not.toContain(sensitiveToken);
+    });
+  });
 });
