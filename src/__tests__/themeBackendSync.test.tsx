@@ -349,4 +349,39 @@ describe('web theme backend sync', () => {
       expect(store.getState().user.profile?.themePreference).toBe(nextPreference);
     },
   );
+
+  it('never reverts profile changes made while the theme request was in flight', async () => {
+    // A brand mid-setup: the store membership is created while the theme
+    // request is outstanding. The sync used to write back the whole profile it
+    // captured before the request, removing the membership — which closed the
+    // open brand-setup modal and dropped the user on the catalogue.
+    const store = createStore({ ...baseUser, type: 'BRAND', themePreference: 'system' });
+    let resolvePatch: (value: unknown) => void = () => undefined;
+    patchMock.mockReturnValue(new Promise((resolve) => { resolvePatch = resolve; }));
+
+    render(
+      <Provider store={store}>
+        <ThemeProvider>
+          <SyncedPreferenceButton value="dark" />
+        </ThemeProvider>
+      </Provider>,
+    );
+
+    fireEvent.click(screen.getByRole('button'));
+    await waitFor(() => expect(patchMock).toHaveBeenCalled());
+
+    const current = store.getState().user.profile!;
+    store.dispatch({
+      type: 'user/setUser',
+      payload: { ...current, storeId: 'store-1', activeBrandId: 'brand-1', brandFullName: 'Ebi Line' },
+    });
+
+    resolvePatch({ data: { themePreference: 'dark' } });
+
+    await waitFor(() => expect(store.getState().user.profile?.themePreference).toBe('dark'));
+    const profile = store.getState().user.profile!;
+    expect(profile.storeId).toBe('store-1');
+    expect((profile as { activeBrandId?: string }).activeBrandId).toBe('brand-1');
+    expect(profile.brandFullName).toBe('Ebi Line');
+  });
 });

@@ -4132,10 +4132,18 @@ html[data-embedded-surface="mobile-app"] .divide-x > :not([hidden]) ~ :not([hidd
       inset 0 -1px 0 var(--wiez-lg-specular-bottom),
       var(--wiez-lg-shadow);
   }
-  .neu-inset-chip,
-  .chip-inset,
-  :is(.dark) .neu-inset-chip,
-  :is(.dark) .chip-inset {
+  /*
+    Unselected chips only. Applied to every chip, `:is(.dark) .neu-inset-chip`
+    matched `.neu-inset-chip.selected` in specificity and came later, so in
+    dark mode it painted selected tags plain glass; only `.selected:focus`
+    outranked it, so the chip just tapped turned purple and every other
+    selected chip went grey, which read as the states being reversed. A
+    selected chip keeps its brand fill (`.neu-inset-chip.selected` above).
+  */
+  .neu-inset-chip:not(.selected),
+  .chip-inset:not(.selected),
+  :is(.dark) .neu-inset-chip:not(.selected),
+  :is(.dark) .chip-inset:not(.selected) {
     background-color: color-mix(in srgb, currentColor 14%, var(--wiez-lg-tint-subtle));
     background-image: var(--wiez-lg-sheen);
     -webkit-backdrop-filter: blur(var(--wiez-lg-blur-subtle)) saturate(var(--wiez-lg-sat-subtle));
