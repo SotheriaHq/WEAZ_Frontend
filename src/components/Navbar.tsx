@@ -452,8 +452,8 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false, immersive = fal
           : minimal
             ? 'border-b border-transparent bg-transparent'
             : isScrolled
-              ? 'wiez-nav-surface-muted'
-              : 'wiez-nav-surface'
+              ? 'wiez-nav-surface'
+              : 'wiez-nav-surface-top'
       }`}
     >
       {/* Readability scrim: over edge-filled media the bar has no surface of
