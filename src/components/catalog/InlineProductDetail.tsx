@@ -7,6 +7,7 @@ import { useImagePreload } from '@/hooks/useImagePreload';
 import { productApi } from '@/api/ProductApi';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { toToastMessage } from '@/utils/errorMessage';
 import type { StoreProduct } from '@/components/designs/StoreProductCard';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import ImageLightbox from './ImageLightbox';
@@ -485,7 +486,7 @@ export default function InlineProductDetail({
         toast.success('Added to wishlist');
       }
     } catch (error: any) {
-      toast.error(error || 'Failed to update wishlist');
+      toast.error(toToastMessage(error, 'Failed to update wishlist'));
     } finally {
       setWishlistBusy(false);
     }
@@ -515,10 +516,7 @@ export default function InlineProductDetail({
       setStartingCustomOrder(true);
       await beginCustomFlow({ id: product.id, name: product.name });
     } catch (error: any) {
-      toast.error(
-        error?.response?.data?.message ||
-          'Unable to open custom-order checkout.',
-      );
+      toast.error(toToastMessage(error, 'Unable to open custom-order checkout.'));
     } finally {
       setStartingCustomOrder(false);
     }
@@ -559,7 +557,7 @@ export default function InlineProductDetail({
       setShowMeasurementModal(false);
       toast.success('Measurements saved and item bagged!');
     } catch (error: any) {
-      toast.error(error || 'Failed to save measurements');
+      toast.error(toToastMessage(error, 'Failed to save measurements'));
     } finally {
       setSavingMeasurements(false);
     }

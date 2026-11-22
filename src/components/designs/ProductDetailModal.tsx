@@ -9,6 +9,7 @@ import { FaXTwitter } from 'react-icons/fa6';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { toToastMessage } from '@/utils/errorMessage';
 import { useNavigate } from 'react-router-dom';
 import type { AppDispatch, RootState } from '@/store';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
@@ -240,7 +241,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         toast.success('Added to wishlist');
       }
     } catch (error: any) {
-      toast.error(error || 'Failed to update wishlist');
+      toast.error(toToastMessage(error, 'Failed to update wishlist'));
     }
   };
 
@@ -262,7 +263,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         onClose();
         navigate(`/products/${product.id}`);
       } else {
-        toast.error(error || 'Failed to bag item');
+        toast.error(toToastMessage(error, 'Failed to bag item'));
       }
     } finally {
       setIsAddingToCart(false);

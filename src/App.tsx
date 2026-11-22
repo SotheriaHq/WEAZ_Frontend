@@ -13,6 +13,7 @@ import { DropdownManagerProvider } from './context/DropdownManagerContext';
 import { BrandPatchProvider } from './context/BrandPatchContext';
 import RequireBrand from './components/RequireBrand';
 import { Toaster } from 'sonner';
+import { ToastBoundary } from './components/ToastBoundary';
 import { NoticeModalHost } from '@/components/ui/NoticeModal';
 import { LiquidGlassLensLayer } from '@/components/ui/LiquidGlassLensLayer';
 import { MuseLoader } from '@/components/loaders/MuseLoader';
@@ -1140,12 +1141,14 @@ const App: React.FC = () => (
               it names, and react — the reported symptom was a submit that
               "failed with no message". `closeButton` still lets anyone dismiss
               early. */}
-          <Toaster
-            position="top-center"
-            richColors
-            closeButton
-            duration={5000}
-          />
+          <ToastBoundary>
+            <Toaster
+              position="top-center"
+              richColors
+              closeButton
+              duration={5000}
+            />
+          </ToastBoundary>
           <NoticeModalHost />
           <LiquidGlassLensLayer />
           <RouterProvider router={router} />
