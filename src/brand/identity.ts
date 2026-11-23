@@ -15,6 +15,8 @@
 /** The product name. There is no former name to surface anywhere. */
 export const PRODUCT_NAME = 'ARU';
 
+export const PRODUCT_SLOGAN = 'Just wear';
+
 export const PRODUCT_TAGLINE = 'When you think WEARS, you think ARU.';
 
 export const PRODUCT_CATEGORY = 'African fashion social commerce marketplace';
@@ -65,18 +67,20 @@ export const BRAND_COLORS = {
  */
 export const BRAND_ASSETS = {
   /**
-   * The drawn name, with the muse as the "I" — so this ALREADY contains the
-   * mark. Anywhere the name is shown, this is the whole lockup.
+   * The drawn name lockup.
    */
-  wordmarkLight: '/brand/wiez-wordmark-light.png',
-  wordmarkDark: '/brand/wiez-wordmark-dark.png',
-  wordmarkLight160: '/brand/wiez-wordmark-light-160.png',
-  wordmarkLight320: '/brand/wiez-wordmark-light-320.png',
-  wordmarkDark160: '/brand/wiez-wordmark-dark-160.png',
-  wordmarkDark320: '/brand/wiez-wordmark-dark-320.png',
+  wordmarkLight: '/brand/aru-wordmark-light.png',
+  wordmarkDark: '/brand/aru-wordmark-dark.png',
+  wordmarkLight160: '/brand/aru-wordmark-light-160.png',
+  wordmarkLight320: '/brand/aru-wordmark-light-320.png',
+  wordmarkDark160: '/brand/aru-wordmark-dark-160.png',
+  wordmarkDark320: '/brand/aru-wordmark-dark-320.png',
+  /** The wordmark with official slogan "— Just wear —" */
+  wordmarkSloganLight: '/brand/aru-wordmark-slogan-light.png',
+  wordmarkSloganDark: '/brand/aru-wordmark-slogan-dark.png',
   /** The symbol alone, for chrome with no room for lettering. */
-  markLight: '/brand/wiez-mark-light.png',
-  markDark: '/brand/wiez-mark-dark.png',
+  markLight: '/brand/aru-mark-light.png',
+  markDark: '/brand/aru-mark-dark.png',
   /**
    * The same mark as a 192px raster, for the loader.
    *
@@ -84,13 +88,15 @@ export const BRAND_ASSETS = {
    * fetch on any screen with buttons but no logo, and rasterising 2853 paths
    * per size buys nothing at that scale.
    */
-  loaderMarkLight: '/brand/wiez-loader-mark-light.png',
-  loaderMarkDark: '/brand/wiez-loader-mark-dark.png',
+  loaderMarkLight: '/brand/aru-loader-mark-light.png',
+  loaderMarkDark: '/brand/aru-loader-mark-dark.png',
   /** For grounds that are not known ahead of time — over imagery, over video. */
-  markNeutral: '/brand/wiez-mark.png',
-  favicon: '/brand/wiez-favicon-48.png',
+  markNeutral: '/brand/aru-mark.png',
+  favicon: '/brand/aru-favicon-48.png',
   /** Social cards have no theme, so this is a raster on the brand ground. */
-  openGraph: '/brand/wiez-og.png',
+  openGraph: '/brand/aru-og.png',
+  /** Transactional email header logo */
+  emailLogo: '/brand/aru-email-logo.png',
 } as const;
 
 /**
