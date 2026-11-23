@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { apiClient } from '@/api/httpClient';
 import { SizeFitApi } from '@/api/SizeFitApi';
 import { Select } from '@/components/ui/Select';
-import { setUser } from '@/features/userSlice';
+import { patchUser } from '@/features/userSlice';
 import {
   PROFILE_GENDER_OPTIONS,
   profileGenderLabel,
@@ -73,7 +73,9 @@ const SizeFitSettings: React.FC = () => {
       const response = await apiClient.patch('/users/me/profile', { gender });
       const payload = response.data?.data ?? response.data;
       const updated = payload?.user ?? payload;
-      dispatch(setUser({ ...user, gender: updated?.gender ?? gender }));
+      // Only the field this save owns; a spread of `user` from before the
+      // request would put back anything that changed meanwhile.
+      dispatch(patchUser({ id: user.id, gender: updated?.gender ?? gender }));
       toast.success('Saved.');
     } catch {
       toast.error('Unable to save that just now.');

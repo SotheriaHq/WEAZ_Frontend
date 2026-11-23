@@ -114,6 +114,27 @@ export const userSlice = createSlice({
       state.profile = normalized;
       state.isAuthenticated = true;
     },
+    /**
+     * Change only the given fields of the signed-in profile.
+     *
+     * For writes that own one setting (theme, gender). They used to dispatch
+     * `setUser({ ...user, field })` with the `user` captured before an await,
+     * and `setUser` merges every field of that snapshot back in, so anything
+     * that changed meanwhile was silently reverted. A theme switch reverting a
+     * just-created store membership closed the open brand-setup modal and
+     * dropped the user on the catalogue. Ignored when no profile is signed in
+     * or the patch names a different account.
+     */
+    patchUser: (state, action: PayloadAction<Partial<AuthUserDto>>) => {
+      const patch = action.payload;
+      if (!state.profile) return;
+      if (patch.id && patch.id !== state.profile.id) return;
+      const normalized = normalizeUser({ ...state.profile, ...patch, id: state.profile.id } as AuthUserDto);
+      state.profile = normalized;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(env.userStorageKey, JSON.stringify(normalized));
+      }
+    },
     clearUser: (state) => {
       state.profile = null;
       state.isAuthenticated = false;
@@ -128,5 +149,5 @@ export const userSlice = createSlice({
   },
 });
 
-export const { setUser, setUserFromStorage, clearUser } = userSlice.actions;
+export const { setUser, setUserFromStorage, patchUser, clearUser } = userSlice.actions;
 export default userSlice.reducer;
