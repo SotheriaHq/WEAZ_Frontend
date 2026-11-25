@@ -7,7 +7,7 @@ import {
   shouldDehydrateWiezQuery,
   WIEZ_QUERY_CACHE_BUSTER,
   WIEZ_QUERY_CACHE_MAX_AGE_MS,
-  WIEZ_QUERY_CACHE_STORAGE_KEY,
+  QUERY_CACHE_STORAGE_KEY,
 } from './queryPersistor';
 
 /*
@@ -58,7 +58,7 @@ describe('primeWiezQueryCacheFromStorage', () => {
   afterEach(() => window.localStorage.clear());
 
   it('puts persisted data in the cache before anything renders', () => {
-    window.localStorage.setItem(WIEZ_QUERY_CACHE_STORAGE_KEY, JSON.stringify(persistedSnapshot()));
+    window.localStorage.setItem(QUERY_CACHE_STORAGE_KEY, JSON.stringify(persistedSnapshot()));
     const client = new QueryClient();
 
     expect(primeWiezQueryCacheFromStorage(client, NOW)).toBe(true);
@@ -66,14 +66,14 @@ describe('primeWiezQueryCacheFromStorage', () => {
   });
 
   it('runs once per page load', () => {
-    window.localStorage.setItem(WIEZ_QUERY_CACHE_STORAGE_KEY, JSON.stringify(persistedSnapshot()));
+    window.localStorage.setItem(QUERY_CACHE_STORAGE_KEY, JSON.stringify(persistedSnapshot()));
     expect(primeWiezQueryCacheFromStorage(new QueryClient(), NOW)).toBe(true);
     expect(primeWiezQueryCacheFromStorage(new QueryClient(), NOW)).toBe(false);
   });
 
   it('refuses a snapshot from another cache version', () => {
     window.localStorage.setItem(
-      WIEZ_QUERY_CACHE_STORAGE_KEY,
+      QUERY_CACHE_STORAGE_KEY,
       JSON.stringify(persistedSnapshot({ buster: 'older-build' })),
     );
     const client = new QueryClient();
@@ -83,7 +83,7 @@ describe('primeWiezQueryCacheFromStorage', () => {
 
   it('refuses a snapshot older than the cache max age', () => {
     window.localStorage.setItem(
-      WIEZ_QUERY_CACHE_STORAGE_KEY,
+      QUERY_CACHE_STORAGE_KEY,
       JSON.stringify(persistedSnapshot({ timestamp: NOW - WIEZ_QUERY_CACHE_MAX_AGE_MS - 1 })),
     );
     const client = new QueryClient();
@@ -94,7 +94,7 @@ describe('primeWiezQueryCacheFromStorage', () => {
   it('survives an empty or corrupt store', () => {
     expect(primeWiezQueryCacheFromStorage(new QueryClient(), NOW)).toBe(false);
     resetWiezQueryCachePrimeForTests();
-    window.localStorage.setItem(WIEZ_QUERY_CACHE_STORAGE_KEY, '{not json');
+    window.localStorage.setItem(QUERY_CACHE_STORAGE_KEY, '{not json');
     expect(primeWiezQueryCacheFromStorage(new QueryClient(), NOW)).toBe(false);
   });
 });
