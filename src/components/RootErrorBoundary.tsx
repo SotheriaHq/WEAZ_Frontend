@@ -29,7 +29,7 @@ const showBootFailure = (message: string) => {
 
   const title = document.createElement('p');
   title.style.cssText = 'font-size:0.95rem;font-weight:600;margin:0 0 0.75rem;';
-  title.textContent = 'WIEZ could not start';
+  title.textContent = 'ARU could not start';
 
   const detail = document.createElement('p');
   detail.style.cssText =
@@ -146,11 +146,11 @@ export class RootErrorBoundary extends React.Component<
         <div className="flex min-h-[100dvh] items-center justify-center bg-white px-6 text-center dark:bg-[#0a0a0a]">
           <div className="max-w-sm space-y-3" role={offline ? 'status' : undefined}>
             <p className="text-base font-semibold text-gray-900 dark:text-white">
-              {offline ? "You're offline" : 'WIEZ could not start'}
+              {offline ? "You're offline" : 'ARU could not start'}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-300">
               {offline
-                ? 'WIEZ will pick up where you left off when your connection returns.'
+                ? 'ARU will pick up where you left off when your connection returns.'
                 : this.state.error.message || 'Unexpected startup error'}
             </p>
             <button

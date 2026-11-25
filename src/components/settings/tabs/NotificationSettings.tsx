@@ -43,7 +43,7 @@ export default function NotificationSettings() {
   const pushOn = settings.push.enabled;
   const sections = visibleNotificationSections(settings).filter(item => item.id !== 'device');
   const renderToggle = (item: NotificationToggle) => <Toggle key={item.id} item={item} settings={settings} pending={isPending(item)} onToggle={onToggle} />;
-  const master = { ...PUSH_MASTER_TOGGLE, description: 'Allow push notifications on phones registered with your WIEZ account. Phone permission is managed in the WIEZ app.' };
+  const master = { ...PUSH_MASTER_TOGGLE, description: 'Allow push notifications on phones registered with your ARU account. Phone permission is managed in the ARU app.' };
   const saveTime = (key: 'quietHoursStart' | 'quietHoursEnd', value: string) => {
     if (value && !isValidQuietHour(value)) { setTimeError('Choose a valid time.'); return; }
     setTimeError(null);
@@ -56,7 +56,7 @@ export default function NotificationSettings() {
     {failed && <div role="alert" className="space-y-2"><p>Setting was not saved. {failed.message}</p>
       <div className="flex flex-wrap gap-4"><button type="button" className="min-h-11 font-semibold text-primary" onClick={retryFailed}>Retry</button>
         <button type="button" className="min-h-11" onClick={dismissFailure}>Dismiss</button></div></div>}
-    {sectionId && (!section || section.id === 'device') ? <p role="alert">This section is unavailable here. Phone registration can be checked in the WIEZ app.</p> : section ? <section data-settings-section>
+    {sectionId && (!section || section.id === 'device') ? <p role="alert">This section is unavailable here. Phone registration can be checked in the ARU app.</p> : section ? <section data-settings-section>
       <SettingsSectionHeading>{section.title}</SettingsSectionHeading>
       {section.requiresPush && !pushOn ? <div><p className="mt-3">Push notifications are off. Your delivery choices are kept.</p>{renderToggle(master)}</div>
       : section.id === 'quiet-hours' ? <div>{renderToggle(QUIET_HOURS_TOGGLE)}
@@ -78,7 +78,7 @@ export default function NotificationSettings() {
         {sections.filter(item => item.group === 'phone').map(item => <SectionLink key={item.id} title={item.title} summary={summarizeNotificationSection(item, settings)} onClick={() => open(item.id)} />)}
       </section>}
       <section data-settings-section><SettingsSectionHeading>What you hear about</SettingsSectionHeading>
-        <p className="my-3 text-sm text-gray-500 dark:text-gray-400">These choices also control your WIEZ inbox while push notifications are off. Message receipts remain separate privacy choices.</p>
+        <p className="my-3 text-sm text-gray-500 dark:text-gray-400">These choices also control your ARU inbox while push notifications are off. Message receipts remain separate privacy choices.</p>
         {sections.filter(item => item.group === 'topics').map(item => <SectionLink key={item.id} title={item.title} summary={summarizeNotificationSection(item, settings)} onClick={() => open(item.id)} />)}
       </section>
     </>}

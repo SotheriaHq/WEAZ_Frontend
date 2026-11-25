@@ -1133,7 +1133,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
         }),
       decision === 'ACCEPTED'
         ? 'Extra time granted. Your delivery date has moved.'
-        : 'Declined. WIEZ is reviewing the order with the maker.',
+        : 'Declined. ARU is reviewing the order with the maker.',
     );
   };
 
@@ -1153,7 +1153,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
           description,
           evidenceJson: {},
         }),
-      'Reported. WIEZ is reviewing this order with your maker.',
+      'Reported. ARU is reviewing this order with your maker.',
     );
   };
 
@@ -1168,7 +1168,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
   };
 
   /**
-   * The shopper's answer to a settlement WIEZ proposed.
+   * The shopper's answer to a settlement ARU proposed.
    *
    * Accepting applies the remedy; declining returns the dispute to the admin
    * handling it with the disagreement still live. The success copy says which
@@ -1185,7 +1185,7 @@ export const BuyerCustomOrderDetailView: React.FC<{
         ),
       accept
         ? 'Agreed. We have told your maker.'
-        : 'Thanks — WIEZ is picking this back up with your maker.',
+        : 'Thanks — ARU is picking this back up with your maker.',
     );
   };
 
@@ -2434,7 +2434,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
 
       {mode === 'summary' && activeView === 'standard' && standardOrders.length > 0 ? (
         <section className="glass-panel rounded-3xl border border-gray-200/70 bg-white/70 p-5 text-center backdrop-blur-md dark:border-white/10 dark:bg-white/5">
-          <h4 className="text-base font-bold text-gray-900 dark:text-white">WIEZ Pro</h4>
+          <h4 className="text-base font-bold text-gray-900 dark:text-white">ARU Pro</h4>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Unlock exclusive drops and lower fees.</p>
           <button
             type="button"
@@ -2447,7 +2447,7 @@ export const OrdersPanel: React.FC<OrdersPanelProps> = ({
         <section className="glass-panel rounded-3xl border border-gray-200/70 bg-white/70 p-5 backdrop-blur-md dark:border-white/10 dark:bg-white/5">
           <h4 className="text-base font-bold text-gray-900 dark:text-white">Buyer Protection</h4>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Every purchase on WIEZ is covered by our authenticity and fulfillment protections.
+            Every purchase on ARU is covered by our authenticity and fulfillment protections.
           </p>
         </section>
       ) : null}

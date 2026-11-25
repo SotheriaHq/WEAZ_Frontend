@@ -49,7 +49,7 @@ vi.mock('@/components/notifications/NotificationsDropdown', () => ({
 
 vi.mock('@/components/brand/BrandWordmark', () => ({
   default: ({ textClassName }: { textClassName?: string }) => (
-    <span className={textClassName}>WIEZ</span>
+    <span className={textClassName}>ARU</span>
   ),
 }));
 

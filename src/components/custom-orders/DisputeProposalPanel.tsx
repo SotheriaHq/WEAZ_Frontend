@@ -44,7 +44,7 @@ function describe(proposal: DisputeProposal): string {
     case 'PARTIAL_REFUND':
       return `You keep the order and receive ${proposal.refundAmount ?? 'a partial refund'} back.`;
     default:
-      return 'WIEZ has proposed a way to settle this order.';
+      return 'ARU has proposed a way to settle this order.';
   }
 }
 
@@ -52,7 +52,7 @@ function deadlineLabel(iso: string | null): string | null {
   if (!iso) return null;
   const ms = Date.parse(iso) - Date.now();
   if (!Number.isFinite(ms)) return null;
-  if (ms <= 0) return 'This has expired — WIEZ will pick it up from here.';
+  if (ms <= 0) return 'This has expired — ARU will pick it up from here.';
   const hours = Math.round(ms / (60 * 60 * 1000));
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} left to answer`;
   const days = Math.round(hours / 24);
@@ -87,7 +87,7 @@ const DisputeProposalPanel: React.FC<Props> = ({ dispute, busy, onRespond }) => 
         <p className="mt-3 rounded-xl bg-white/70 p-3 text-sm italic leading-6 text-gray-700 dark:bg-white/5 dark:text-gray-300">
           “{proposal.note}”
           <span className="mt-1 block text-xs not-italic text-gray-500 dark:text-gray-400">
-            — WIEZ
+            — ARU
           </span>
         </p>
       ) : null}
@@ -101,14 +101,14 @@ const DisputeProposalPanel: React.FC<Props> = ({ dispute, busy, onRespond }) => 
       {/* Before the buttons, every time. "No" is the one people misread. */}
       <p className="mt-3 text-xs leading-5 text-gray-600 dark:text-gray-400">
         Saying no does not close your dispute or end your order — it goes back
-        to the person at WIEZ handling it, and they keep working on it with you.
+        to the person at ARU handling it, and they keep working on it with you.
       </p>
 
       {answered !== null ? (
         <p className="mt-4 rounded-xl bg-white/70 p-3 text-sm text-gray-700 dark:bg-white/5 dark:text-gray-300">
           {answered
-            ? '✅ Thanks — we have told your maker and WIEZ.'
-            : 'Thanks. WIEZ is picking this back up with your maker.'}
+            ? '✅ Thanks — we have told your maker and ARU.'
+            : 'Thanks. ARU is picking this back up with your maker.'}
         </p>
       ) : (
         <div className="mt-4 flex flex-wrap gap-2">

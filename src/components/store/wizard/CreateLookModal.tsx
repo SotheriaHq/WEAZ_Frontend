@@ -49,7 +49,7 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [styledBy, setStyledBy] = useState('WIEZ Official');
+  const [styledBy, setStyledBy] = useState('ARU Official');
   const [lookImage, setLookImage] = useState<string | null>(null);
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [featured, setFeatured] = useState(true);
@@ -298,7 +298,7 @@ const CreateLookModal: React.FC<CreateLookModalProps> = ({
                       value={styledBy}
                       onChange={(e) => setStyledBy(e.target.value)}
                     >
-                      <option value="WIEZ Official">WIEZ Official</option>
+                      <option value="ARU Official">ARU Official</option>
                       <option value="Brand Owner">Brand Owner</option>
                       <option value="Guest Stylist">Guest Stylist</option>
                     </Select>

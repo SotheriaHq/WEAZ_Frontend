@@ -9,8 +9,8 @@ const fixture = (overrides: Partial<QueuePresenter> = {}): QueuePresenter => ({ 
 afterEach(() => vi.restoreAllMocks());
 describe('queue presentation boundaries', () => {
   it('shows cancellation due without claiming that local expiry cancelled the order', () => {
-    expect(formatQueueCountdown(new Date(now).toISOString(), now)).toBe('Cancellation due - refreshing from WIEZ');
-    expect(formatQueueCountdown(new Date(now - 1).toISOString(), now)).toBe('Cancellation due - refreshing from WIEZ');
+    expect(formatQueueCountdown(new Date(now).toISOString(), now)).toBe('Cancellation due - refreshing from ARU');
+    expect(formatQueueCountdown(new Date(now - 1).toISOString(), now)).toBe('Cancellation due - refreshing from ARU');
     expect(formatQueueCountdown(null, now)).toBeNull();
     expect(formatQueueCountdown('invalid', now)).toBeNull();
   });

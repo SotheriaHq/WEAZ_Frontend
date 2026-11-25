@@ -3,6 +3,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import type { AuthUserDto } from '../types/auth';
 import { env } from '../config/env';
 import { normalizeThemePreference } from '@/types/theme';
+import { WebSessionStorageAdapter } from '@/auth/sessionAdapter';
 
 export interface UserState {
   profile: AuthUserDto | null;
@@ -58,7 +59,9 @@ const parsePersistedProfile = (raw: string | null): AuthUserDto | null => {
   }
 };
 
-const persistedProfile = typeof window !== 'undefined' ? localStorage.getItem(env.userStorageKey) : null;
+const persistedProfile = typeof window !== 'undefined'
+  ? (WebSessionStorageAdapter.getUserProfile() ?? localStorage.getItem(env.userStorageKey))
+  : null;
 
 const initialProfile: AuthUserDto | null = parsePersistedProfile(persistedProfile);
 
@@ -88,6 +91,7 @@ export const userSlice = createSlice({
       state.profile = normalized;
       state.isAuthenticated = true;
       if (typeof window !== 'undefined') {
+        WebSessionStorageAdapter.setUserProfile(JSON.stringify(normalized));
         localStorage.setItem(env.userStorageKey, JSON.stringify(normalized));
       }
     },
@@ -135,6 +139,10 @@ export const userSlice = createSlice({
       state.profile = null;
       state.isAuthenticated = false;
       if (typeof window !== 'undefined') {
+        localStorage.removeItem(WebSessionStorageAdapter.PRIMARY_USER_KEY);
+        for (const legacyKey of WebSessionStorageAdapter.LEGACY_USER_KEYS) {
+          localStorage.removeItem(legacyKey);
+        }
         localStorage.removeItem(env.userStorageKey);
       }
     },

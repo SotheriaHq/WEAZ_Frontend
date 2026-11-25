@@ -470,7 +470,7 @@ const AdminOrderDetailPage: React.FC = () => {
                 Finance breakdown
               </h2>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                WIEZ ledger and escrow state for this standard order.
+                ARU ledger and escrow state for this standard order.
               </p>
             </div>
 

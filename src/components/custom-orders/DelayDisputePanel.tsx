@@ -38,7 +38,7 @@ const unavailableCopy = (
     case 'WITHIN_GRACE': {
       const at = formatDateTime(eligibility.availableAt);
       return at
-        ? `Your maker is past the production date. Give them a little room — if nothing has moved by ${at}, you can escalate this to WIEZ.`
+        ? `Your maker is past the production date. Give them a little room — if nothing has moved by ${at}, you can escalate this to ARU.`
         : 'Your maker is just past the production date. Message them first — you can escalate shortly if nothing moves.';
     }
     case 'NOT_LATE_YET':
@@ -105,7 +105,7 @@ export const DelayDisputePanel: React.FC<{
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-bold text-amber-950 dark:text-amber-50 sm:text-lg">
               {interventionOpen
-                ? 'WIEZ is looking into this delay'
+                ? 'ARU is looking into this delay'
                 : 'Your delay report is open'}
             </h3>
             <p className="mt-1 text-[13px] text-amber-900/85 dark:text-amber-100/85">
@@ -219,7 +219,7 @@ export const DelayDisputePanel: React.FC<{
               : 'This order has missed its production date'}
           </h3>
           <p className="mt-1 text-[13px] text-rose-900/85 dark:text-rose-100/85">
-            If your maker has not explained the delay, you can bring WIEZ in.
+            If your maker has not explained the delay, you can bring ARU in.
           </p>
         </div>
       </div>
@@ -232,7 +232,7 @@ export const DelayDisputePanel: React.FC<{
       <p className="mt-3 text-[12px] leading-snug text-rose-900/85 dark:text-rose-100/85">
         Reporting this does <strong>not</strong> cancel your order or refund it,
         and your maker keeps working. It freezes their payment and puts a person
-        at WIEZ on it, who will talk to you both.
+        at ARU on it, who will talk to you both.
       </p>
 
       {reporting ? (
@@ -281,7 +281,7 @@ export const DelayDisputePanel: React.FC<{
             onClick={() => setReporting(true)}
             className="rounded-full bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2 disabled:opacity-60"
           >
-            Report the delay to WIEZ
+            Report the delay to ARU
           </button>
           {onMessageMaker ? (
             <button

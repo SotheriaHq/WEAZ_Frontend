@@ -120,18 +120,61 @@ describe('consent-gated third parties', () => {
     const next = await import('@/privacy/consent');
     expect(next.getConsentState().decided).toBe(true);
 
+    localStorage.clear();
     localStorage.setItem('wiez.consent', JSON.stringify({ version: 0, analytics: true }));
     vi.resetModules();
     const outdated = await import('@/privacy/consent');
     expect(outdated.getConsentState().decided).toBe(false);
     expect(outdated.isAllowed('analytics')).toBe(false);
 
+    localStorage.clear();
     const thirteenMonthsAgo = new Date(Date.now() - 395 * 24 * 60 * 60 * 1000).toISOString();
     localStorage.setItem('wiez.consent', JSON.stringify({ version: 1, decidedAt: thirteenMonthsAgo, analytics: true }));
     vi.resetModules();
     const expired = await import('@/privacy/consent');
     expect(expired.getConsentState().decided).toBe(false);
     expect(expired.analyticsPermitted()).toBe(false);
+  });
+
+  it('dual-reads legacy wiez.consent, migrates to aru.consent, and retires legacy without resetting user choice', async () => {
+    localStorage.clear();
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const legacyChoice = {
+      version: 1,
+      decidedAt: oneDayAgo,
+      analytics: true,
+      thirdPartySignIn: false,
+    };
+    localStorage.setItem('wiez.consent', JSON.stringify(legacyChoice));
+
+    vi.resetModules();
+    const consent = await import('@/privacy/consent');
+    const state = consent.getConsentState();
+    expect(state.decided).toBe(true);
+    expect(state.record?.analytics).toBe(true);
+    expect(state.record?.thirdPartySignIn).toBe(false);
+    expect(consent.isAllowed('analytics')).toBe(true);
+    expect(consent.isAllowed('thirdPartySignIn')).toBe(false);
+
+    // Verified opportunistic migration: aru.consent populated, wiez.consent retired
+    expect(localStorage.getItem('aru.consent')).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem('aru.consent')!)).toMatchObject({
+      version: 1,
+      analytics: true,
+      thirdPartySignIn: false,
+    });
+    expect(localStorage.getItem('wiez.consent')).toBeNull();
+
+    // Saving updates aru.consent and keeps wiez.consent cleared
+    consent.saveConsent(consent.OPTIONAL_OFF);
+    expect(JSON.parse(localStorage.getItem('aru.consent')!)).toMatchObject({
+      analytics: false,
+      thirdPartySignIn: false,
+    });
+    expect(localStorage.getItem('wiez.consent')).toBeNull();
+
+    localStorage.clear();
+    vi.resetModules();
   });
 });
 
@@ -199,5 +242,163 @@ describe('cookie banner', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(consent.getConsentState().record).toMatchObject({ analytics: true });
+  });
+});
+
+describe('executable privacy consent failure paths (PC-01 to PC-15)', () => {
+  const now = new Date().toISOString();
+  const validApproval = JSON.stringify({ version: 1, decidedAt: now, analytics: true, thirdPartySignIn: true });
+  const validRefusal = JSON.stringify({ version: 1, decidedAt: now, analytics: false, thirdPartySignIn: false });
+
+  it('PC-01: Legacy refusal only -> refusal preserved without re-prompting', async () => {
+    localStorage.setItem('wiez.consent', validRefusal);
+    const consent = await import('@/privacy/consent');
+    expect(consent.getConsentState().decided).toBe(true);
+    expect(consent.isAllowed('analytics')).toBe(false);
+    expect(consent.analyticsPermitted()).toBe(false);
+    expect(localStorage.getItem('aru.consent')).toBeTruthy();
+    expect(localStorage.getItem('wiez.consent')).toBeNull();
+  });
+
+  it('PC-02: Legacy approval only -> approved scope preserved and migrated', async () => {
+    localStorage.setItem('wiez.consent', validApproval);
+    const consent = await import('@/privacy/consent');
+    expect(consent.getConsentState().decided).toBe(true);
+    expect(consent.isAllowed('analytics')).toBe(true);
+    expect(consent.analyticsPermitted()).toBe(true);
+    expect(localStorage.getItem('aru.consent')).toBeTruthy();
+    expect(localStorage.getItem('wiez.consent')).toBeNull();
+  });
+
+  it('PC-03: ARU and WIEZ records agree -> canonical primary state retained', async () => {
+    localStorage.setItem('aru.consent', validApproval);
+    localStorage.setItem('wiez.consent', validApproval);
+    const consent = await import('@/privacy/consent');
+    expect(consent.getConsentState().decided).toBe(true);
+    expect(consent.isAllowed('analytics')).toBe(true);
+  });
+
+  it('PC-04: ARU and WIEZ records conflict -> primary key takes absolute precedence', async () => {
+    localStorage.setItem('aru.consent', validApproval);
+    localStorage.setItem('wiez.consent', validRefusal);
+    const consent = await import('@/privacy/consent');
+    expect(consent.isAllowed('analytics')).toBe(true);
+  });
+
+  it('PC-05: Corrupted ARU record, valid legacy record -> safe fallback and recovery', async () => {
+    localStorage.setItem('aru.consent', '{ corrupt json');
+    localStorage.setItem('wiez.consent', validApproval);
+    const consent = await import('@/privacy/consent');
+    expect(consent.getConsentState().decided).toBe(true);
+    expect(consent.isAllowed('analytics')).toBe(true);
+    expect(localStorage.getItem('wiez.consent')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('aru.consent')!)).toMatchObject({ analytics: true });
+  });
+
+  it('PC-06: Valid ARU record, corrupted legacy record -> canonical state retained', async () => {
+    localStorage.setItem('aru.consent', validRefusal);
+    localStorage.setItem('wiez.consent', '{ corrupt json');
+    const consent = await import('@/privacy/consent');
+    expect(consent.isAllowed('analytics')).toBe(false);
+  });
+
+  it('PC-07: Both records corrupted -> safe default (decided=false, analytics=false)', async () => {
+    localStorage.setItem('aru.consent', '{ bad');
+    localStorage.setItem('wiez.consent', '{ also bad');
+    const consent = await import('@/privacy/consent');
+    expect(consent.getConsentState().decided).toBe(false);
+    expect(consent.isAllowed('analytics')).toBe(false);
+    expect(consent.analyticsPermitted()).toBe(false);
+  });
+
+  it('PC-08: Canonical write fails -> error safely handled, no unauthorized consent', async () => {
+    const consent = await import('@/privacy/consent');
+    const setSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    try {
+      expect(() => consent.saveConsent(consent.OPTIONAL_OFF)).not.toThrow();
+      expect(consent.isAllowed('analytics')).toBe(false);
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
+  it('PC-09: Read-back fails or mismatches -> legacy key protected against deletion', async () => {
+    localStorage.setItem('wiez.consent', validApproval);
+    const removeSpy = vi.spyOn(Storage.prototype, 'removeItem');
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) => {
+      if (key === 'aru.consent') return 'corrupted-readback-mismatch';
+      if (key === 'wiez.consent') return validApproval;
+      return null;
+    });
+    try {
+      await import('@/privacy/consent');
+      expect(removeSpy).not.toHaveBeenCalledWith('wiez.consent');
+    } finally {
+      getItemSpy.mockRestore();
+      removeSpy.mockRestore();
+    }
+  });
+
+  it('PC-10: Legacy deletion fails -> primary write verified, safe repeatable migration', async () => {
+    localStorage.setItem('wiez.consent', validApproval);
+    const removeSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key: string) => {
+      if (key === 'wiez.consent') throw new Error('Permission denied');
+    });
+    try {
+      const consent = await import('@/privacy/consent');
+      expect(consent.isAllowed('analytics')).toBe(true);
+      expect(localStorage.getItem('aru.consent')).toBeTruthy();
+    } finally {
+      removeSpy.mockRestore();
+    }
+  });
+
+  it('PC-11: Analytics withdrawn in another tab -> tracking permission revoked', async () => {
+    localStorage.setItem('aru.consent', validApproval);
+    const consent = await import('@/privacy/consent');
+    expect(consent.analyticsPermitted()).toBe(true);
+
+    localStorage.setItem('aru.consent', validRefusal);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'aru.consent', newValue: validRefusal }));
+
+    expect(consent.isAllowed('analytics')).toBe(false);
+    expect(consent.analyticsPermitted()).toBe(false);
+  });
+
+  it('PC-12: Conflicting cross-tab storage events -> safe canonical state maintained', async () => {
+    localStorage.setItem('aru.consent', validRefusal);
+    const consent = await import('@/privacy/consent');
+    expect(consent.isAllowed('analytics')).toBe(false);
+
+    window.dispatchEvent(new StorageEvent('storage', { key: 'wiez.consent', newValue: validApproval }));
+    expect(consent.isAllowed('analytics')).toBe(false);
+  });
+
+  it('PC-13: Reload after interrupted migration -> existing decision preserved', async () => {
+    localStorage.setItem('aru.consent', validApproval);
+    localStorage.setItem('wiez.consent', validApproval);
+    const consent = await import('@/privacy/consent');
+    expect(consent.getConsentState().decided).toBe(true);
+    expect(consent.isAllowed('analytics')).toBe(true);
+  });
+
+  it('PC-14: No valid consent exists -> optional integrations remain strictly gated', async () => {
+    const consent = await import('@/privacy/consent');
+    expect(consent.getConsentState().decided).toBe(false);
+    expect(consent.isAllowed('analytics')).toBe(false);
+    expect(consent.analyticsPermitted()).toBe(false);
+  });
+
+  it('PC-15: Consent withdrawal -> no unauthorized reactivation', async () => {
+    localStorage.setItem('aru.consent', validApproval);
+    const consent = await import('@/privacy/consent');
+    expect(consent.analyticsPermitted()).toBe(true);
+
+    consent.saveConsent(consent.OPTIONAL_OFF);
+    expect(consent.isAllowed('analytics')).toBe(false);
+    expect(consent.analyticsPermitted()).toBe(false);
+    expect(localStorage.getItem('wiez.consent')).toBeNull();
   });
 });

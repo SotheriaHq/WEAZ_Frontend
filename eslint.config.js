@@ -46,6 +46,8 @@ export default tseslint.config([
             'src/pages/Login.tsx',
             'src/pages/SignUp.tsx',
             // Static, dimensioned brand artwork is decorative chrome, not uploaded media.
+            'src/brand/AruMark.tsx',
+            'src/brand/AruWordmark.tsx',
             'src/brand/WiezMark.tsx',
             'src/brand/WiezWordmark.tsx',
             // Static, dimensioned country flag svgs are decorative chrome, not uploaded media.

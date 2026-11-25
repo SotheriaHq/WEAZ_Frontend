@@ -121,7 +121,7 @@ export default function VerificationSubmittedPage() {
             What Happens Next
           </p>
           <div className="space-y-3 text-xs leading-relaxed text-on-surface-variant">
-            <p>• WIEZ compliance team reviews submissions sequentially in order of receipt.</p>
+            <p>• ARU compliance team reviews submissions sequentially in order of receipt.</p>
             <p>
               • If additional information or document correction is needed, field-specific notifications will appear on your workspace.
             </p>

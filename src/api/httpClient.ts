@@ -15,7 +15,7 @@ import type { AuthTokensResponse } from '../types/auth';
 import { env } from '../config/env';
 import { finishNetworkTrace, startNetworkTrace } from './networkTrace';
 import { createRequestId } from '../utils/requestId';
-import { getWebDeviceId, WIEZ_DEVICE_ID_HEADER } from '../utils/deviceId';
+import { getWebDeviceId, ARU_DEVICE_ID_HEADER, WIEZ_DEVICE_ID_HEADER } from '../utils/deviceId';
 
 let consecutiveRefreshFailures = 0;
 let lastRefreshFailureAt = 0;
@@ -362,14 +362,20 @@ const attachRequestMetadata = (config: InternalAxiosRequestConfig) => {
   // It is what keeps a view from being counted twice when the same person
   // views something signed out, signs in, and views it again: the user identity
   // changes, this does not.
-  if (!headers.get(WIEZ_DEVICE_ID_HEADER)) {
+  if (!headers.get(WIEZ_DEVICE_ID_HEADER) && !headers.get(ARU_DEVICE_ID_HEADER)) {
     const deviceId = getWebDeviceId();
-    if (deviceId) headers.set(WIEZ_DEVICE_ID_HEADER, deviceId);
+    if (deviceId) {
+      headers.set(ARU_DEVICE_ID_HEADER, deviceId);
+      headers.set(WIEZ_DEVICE_ID_HEADER, deviceId);
+    }
   }
 
   if (String(config.url ?? '').startsWith('/auth/')) {
     const device = getSecurityDeviceId();
-    if (device) headers.set('x-wiez-security-device', device);
+    if (device) {
+      headers.set('x-aru-security-device', device);
+      headers.set('x-wiez-security-device', device);
+    }
   }
   const token = isBoundLogout(config as SessionRequest)
     ? (config as SessionRequest)._logoutToken : volatileAccessToken;
@@ -439,8 +445,12 @@ apiClient.interceptors.response.use(
         currentSecurityIdentity, originalRequest.signal);
       if (verified) {
         const headers = getHeaders(originalRequest);
+        headers.delete('x-aru-action-proof');
         headers.delete('x-wiez-action-proof');
-        if (verified.proof) headers.set('x-wiez-action-proof', verified.proof);
+        if (verified.proof) {
+          headers.set('x-aru-action-proof', verified.proof);
+          headers.set('x-wiez-action-proof', verified.proof);
+        }
         // Preserve the serialized body, quote and idempotency key exactly as sent.
         return apiClient(originalRequest);
       }

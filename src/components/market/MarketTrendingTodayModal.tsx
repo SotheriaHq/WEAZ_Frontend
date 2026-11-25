@@ -99,7 +99,7 @@ export const MarketTrendingTodayModal: React.FC<MarketTrendingTodayModalProps> =
               {dayLabel}
             </h2>
             <p className="mt-1 text-xs text-[color:var(--text-secondary)]">
-              {products.length} {products.length === 1 ? 'piece' : 'pieces'} trending on WIEZ today.
+              {products.length} {products.length === 1 ? 'piece' : 'pieces'} trending on ARU today.
             </p>
           </div>
           <button
@@ -148,7 +148,7 @@ export const MarketTrendingTodayModal: React.FC<MarketTrendingTodayModalProps> =
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--text-secondary)]">
-                        {product.brand?.name || 'WIEZ Brand'}
+                        {product.brand?.name || 'ARU Brand'}
                       </span>
                       <span className="mt-0.5 truncate font-serif text-base leading-tight text-[color:var(--text-primary)]">
                         {product.name}

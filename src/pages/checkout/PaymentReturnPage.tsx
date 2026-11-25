@@ -360,7 +360,7 @@ const PaymentReturnPage: React.FC = () => {
         <div className="mb-6 text-6xl">🧾</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Payment return data is missing</h1>
         <p className="mb-8 text-gray-500 dark:text-zinc-400">
-          WIEZ could not find the reference needed to resume this payment flow.
+          ARU could not find the reference needed to resume this payment flow.
         </p>
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
           <Button onClick={() => navigate('/profile?tab=orders')}>Open my orders</Button>
@@ -377,7 +377,7 @@ const PaymentReturnPage: React.FC = () => {
         <div className="mb-6 text-6xl">🌀</div>
         <h1 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Verifying payment</h1>
         <p className="text-gray-500 dark:text-zinc-400">
-          Stage 1/2 - WIEZ is checking the latest payment status for reference {reference || 'unknown'}.
+          Stage 1/2 - ARU is checking the latest payment status for reference {reference || 'unknown'}.
         </p>
       </div>
     );
@@ -454,7 +454,7 @@ const PaymentReturnPage: React.FC = () => {
       {shouldAutoVerify && autoVerifyAttempts < AUTO_VERIFY_MAX_ATTEMPTS && (
         <div className="mb-8 rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-left text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
           <p>
-            WIEZ is checking automatically every 10 seconds (attempt {Math.min(autoVerifyAttempts + 1, AUTO_VERIFY_MAX_ATTEMPTS)} of {AUTO_VERIFY_MAX_ATTEMPTS}).
+            ARU is checking automatically every 10 seconds (attempt {Math.min(autoVerifyAttempts + 1, AUTO_VERIFY_MAX_ATTEMPTS)} of {AUTO_VERIFY_MAX_ATTEMPTS}).
           </p>
           <p className="mt-1">
             You can safely leave this page — your payment is being confirmed in the background.
@@ -485,7 +485,7 @@ const PaymentReturnPage: React.FC = () => {
               Retry this payment from your bag checkout
             </h2>
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              WIEZ now uses one payment initialization path. Prepare this custom order in your bag, then complete payment in checkout.
+              ARU now uses one payment initialization path. Prepare this custom order in your bag, then complete payment in checkout.
             </p>
           </div>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">

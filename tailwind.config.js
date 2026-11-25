@@ -44,6 +44,16 @@ export default {
           dark: '#000000',
           gold: '#D4AF37',
         },
+        // Additive ARU brand color aliases (non-breaking forward-compatibility bridge)
+        aru: {
+          mark: 'var(--aru-brand-mark, var(--wiez-brand-mark))',
+          'mark-ondark': 'var(--aru-brand-mark-ondark, var(--wiez-brand-mark-ondark))',
+          primary: 'var(--brand-primary)',
+          'primary-strong': 'var(--brand-primary-strong)',
+          accent: 'var(--brand-accent)',
+          dark: '#000000',
+          gold: '#D4AF37',
+        },
         surface: {
           page: 'var(--wiez-surface-page)',
           card: 'var(--wiez-surface-card)',

@@ -8,7 +8,7 @@ export type ResolvedInAppPaymentSession = {
 };
 
 export const IN_APP_PAYMENT_SESSION_ERROR =
-  'WIEZ only supports secure in-app checkout sessions. Retry the payment from inside WIEZ.';
+  'ARU only supports secure in-app checkout sessions. Retry the payment from inside ARU.';
 
 export const resolvePaymentGateway = (
   session: Pick<InAppPaymentSession, 'gateway'>,

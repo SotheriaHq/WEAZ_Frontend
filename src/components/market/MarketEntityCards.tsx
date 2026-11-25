@@ -89,7 +89,7 @@ export function MarketItemTile({ item, onOpen, className = '' }: CardProps) {
         <div className="min-w-0">
           <ProductTile.Title>{item.title}</ProductTile.Title>
           <ProductTile.Meta className="mt-0.5">
-            <span className="truncate">{item.brand?.name || item.subtitle || 'WIEZ brand'}</span>
+            <span className="truncate">{item.brand?.name || item.subtitle || 'ARU brand'}</span>
           </ProductTile.Meta>
           {price ? <ProductTile.Price className="mt-1" price={price} /> : null}
         </div>

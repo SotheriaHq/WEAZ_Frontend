@@ -24,7 +24,7 @@ export const PROFILE_GENDER_OPTIONS: ReadonlyArray<{
 
 export const PROFILE_GENDER_PROMPT = {
   title: 'How should we size clothes for you?',
-  body: 'This helps WIEZ estimate your size and show clothes that fit how you shop. You can change it later in settings.',
+  body: 'This helps ARU estimate your size and show clothes that fit how you shop. You can change it later in settings.',
   question: 'Are you a…',
 } as const;
 

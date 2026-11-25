@@ -10,7 +10,9 @@ export const WIEZ_QUERY_CACHE_BUSTER = 'WIEZ-web-phase2-v3';
 // handled by staleTime + silent SWR revalidation — old-but-present data
 // paints instantly and refreshes in the background.
 export const WIEZ_QUERY_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+export const ARU_QUERY_CACHE_STORAGE_KEY = 'ARU_QUERY_CACHE_V1';
 export const WIEZ_QUERY_CACHE_STORAGE_KEY = 'WIEZ_QUERY_CACHE_V1';
+export const QUERY_CACHE_STORAGE_KEY = ARU_QUERY_CACHE_STORAGE_KEY;
 
 const getStorage = () => (typeof window === 'undefined' ? undefined : window.localStorage);
 
@@ -78,9 +80,16 @@ const serializeWithinBudget = (client: PersistedClient): string => {
   return serialized;
 };
 
+// Invalidate legacy query cache on boot per Document 26 lifecycle rule
+try {
+  getStorage()?.removeItem(WIEZ_QUERY_CACHE_STORAGE_KEY);
+} catch {
+  // Best effort
+}
+
 export const wiezQueryPersister = createSyncStoragePersister({
   storage: createSafeStorage(),
-  key: WIEZ_QUERY_CACHE_STORAGE_KEY,
+  key: ARU_QUERY_CACHE_STORAGE_KEY,
   throttleTime: 1000,
   serialize: serializeWithinBudget,
 });
@@ -145,6 +154,7 @@ export const purgeWebPersistedQueryCache = () => {
   }
 
   try {
+    getStorage()?.removeItem(ARU_QUERY_CACHE_STORAGE_KEY);
     getStorage()?.removeItem(WIEZ_QUERY_CACHE_STORAGE_KEY);
   } catch {
     // Storage may be unavailable in restricted browser contexts.

@@ -16,7 +16,7 @@ export const QRExportFrame: React.FC<QRExportFrameProps> = ({
       {title ? (
         <div className="mb-3 px-1">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-            WIEZ QR
+            ARU QR
           </p>
           <h4 className="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
             {title}

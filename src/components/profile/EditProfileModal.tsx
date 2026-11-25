@@ -610,7 +610,7 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   <label className="text-sm font-semibold text-theme-secondary">Brand Name</label>
                   <input 
                     type="text" 
-                    placeholder="e.g. WIEZ Couture"
+                    placeholder="e.g. ARU Couture"
                     className="form-field w-full h-12 px-4 rounded-lg"
                     {...register('brandFullName')}
                   />

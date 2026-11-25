@@ -535,7 +535,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   const productionLockReason = useMemo((): string | null => {
     if (!order) return null;
     if (openDisputeCount > 0) {
-      return 'This order is in dispute. Production and lifecycle updates are frozen while WIEZ reviews it — reply in the Notices tab and the controls unlock when the dispute is resolved.';
+      return 'This order is in dispute. Production and lifecycle updates are frozen while ARU reviews it — reply in the Notices tab and the controls unlock when the dispute is resolved.';
     }
     switch (order.status) {
       case 'DELIVERY_ISSUE_REPORTED':
@@ -667,7 +667,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
   const extensionBlockedReason = useMemo(() => {
     if (!order) return null;
     if (extensionPolicy?.rushBlocked) {
-      return 'This shopper paid for rush production, so extra time cannot be requested on this order. If you cannot meet the date, contact WIEZ.';
+      return 'This shopper paid for rush production, so extra time cannot be requested on this order. If you cannot meet the date, contact ARU.';
     }
     if (outstandingExtension) {
       return outstandingExtension.buyerResponseStatus === 'COUNTERED'
@@ -676,8 +676,8 @@ const StudioCustomOrderDetailPage: React.FC = () => {
     }
     if (extensionPolicy?.exhausted) {
       return extensionPolicy.remainingExtensions <= 0
-        ? `You have already used both extension requests on this order (${extensionPolicy.totalExtensionDaysGranted} days granted). Contact WIEZ if you still cannot meet the date.`
-        : `This order has no extension days left (${extensionPolicy.totalExtensionDaysGranted} of ${extensionPolicy.maxTotalDays} used). Contact WIEZ if you still cannot meet the date.`;
+        ? `You have already used both extension requests on this order (${extensionPolicy.totalExtensionDaysGranted} days granted). Contact ARU if you still cannot meet the date.`
+        : `This order has no extension days left (${extensionPolicy.totalExtensionDaysGranted} of ${extensionPolicy.maxTotalDays} used). Contact ARU if you still cannot meet the date.`;
     }
     return null;
   }, [extensionPolicy, order, outstandingExtension]);
@@ -866,7 +866,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
                 ) : null}
               </div>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Reminders and dispute notices from the WIEZ admin team. These are read-only — you can submit a single response on a dispute, but there's no back-and-forth here.
+                Reminders and dispute notices from the ARU admin team. These are read-only — you can submit a single response on a dispute, but there's no back-and-forth here.
               </p>
             </div>
             {order.hasUnreadAdminNotice ? (
@@ -1554,7 +1554,7 @@ const StudioCustomOrderDetailPage: React.FC = () => {
             <span aria-hidden="true">{noticeUrgency === 'urgent' ? '🚨' : '🔴'}</span>
             {noticeUrgency === 'urgent'
               ? `${openDisputeCount} open dispute${openDisputeCount === 1 ? '' : 's'} need your attention`
-              : 'You have an unread notice from the WIEZ admin team'}
+              : 'You have an unread notice from the ARU admin team'}
           </span>
           <span className="shrink-0 text-xs font-bold uppercase tracking-[0.16em] text-rose-700 dark:text-rose-300">
             Open notices →

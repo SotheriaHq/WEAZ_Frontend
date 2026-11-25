@@ -12,7 +12,10 @@ import { useSyncExternalStore } from 'react';
  * asked again instead of the new purpose inheriting an old "yes".
  */
 export const CONSENT_VERSION = 1;
-const STORAGE_KEY = 'wiez.consent';
+export const PRIMARY_CONSENT_STORAGE_KEY = 'aru.consent';
+export const LEGACY_CONSENT_STORAGE_KEY = 'wiez.consent';
+/** @deprecated Use PRIMARY_CONSENT_STORAGE_KEY */
+export const STORAGE_KEY = PRIMARY_CONSENT_STORAGE_KEY;
 /** A choice is kept for twelve months, then the visitor is asked again. */
 export const CONSENT_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -46,10 +49,9 @@ export const OPTIONAL_ON: ConsentChoices = {
   thirdPartySignIn: true,
 };
 
-const readRecord = (): ConsentRecord | null => {
+const parseRecord = (raw: string | null): ConsentRecord | null => {
+  if (!raw) return null;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ConsentRecord>;
     if (parsed?.version !== CONSENT_VERSION) return null;
     const decidedAt = Date.parse(String(parsed.decidedAt ?? ''));
@@ -60,6 +62,40 @@ const readRecord = (): ConsentRecord | null => {
       analytics: parsed.analytics === true,
       thirdPartySignIn: parsed.thirdPartySignIn === true,
     };
+  } catch {
+    return null;
+  }
+};
+
+const readRecord = (): ConsentRecord | null => {
+  if (typeof window === 'undefined') return null;
+
+  // 1. Dual-read primary key first
+  try {
+    const primaryRecord = parseRecord(window.localStorage.getItem(PRIMARY_CONSENT_STORAGE_KEY));
+    if (primaryRecord) return primaryRecord;
+  } catch {
+    // Primary storage read failed, fall through to legacy fallback
+  }
+
+  // 2. Dual-read legacy fallback
+  try {
+    const legacyRecord = parseRecord(window.localStorage.getItem(LEGACY_CONSENT_STORAGE_KEY));
+    if (!legacyRecord) return null;
+
+    // Opportunistically migrate to primary key with read-back verification
+    try {
+      const serialized = JSON.stringify(legacyRecord);
+      window.localStorage.setItem(PRIMARY_CONSENT_STORAGE_KEY, serialized);
+      const verified = window.localStorage.getItem(PRIMARY_CONSENT_STORAGE_KEY);
+      if (verified === serialized) {
+        window.localStorage.removeItem(LEGACY_CONSENT_STORAGE_KEY);
+      }
+    } catch {
+      // Storage write error during migration must not block returning the valid choice
+    }
+
+    return legacyRecord;
   } catch {
     return null;
   }
@@ -119,7 +155,12 @@ export const saveConsent = (choices: ConsentChoices) => {
     thirdPartySignIn: choices.thirdPartySignIn === true,
   };
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(record));
+    const serialized = JSON.stringify(record);
+    window.localStorage.setItem(PRIMARY_CONSENT_STORAGE_KEY, serialized);
+    const verified = window.localStorage.getItem(PRIMARY_CONSENT_STORAGE_KEY);
+    if (verified === serialized) {
+      window.localStorage.removeItem(LEGACY_CONSENT_STORAGE_KEY);
+    }
   } catch {
     // Private mode or full storage: the choice still applies to this visit.
   }
@@ -138,7 +179,7 @@ export const closeConsentSettings = () => {
 // A choice made in another tab applies here too.
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (event) => {
-    if (event.key !== STORAGE_KEY) return;
+    if (event.key !== PRIMARY_CONSENT_STORAGE_KEY && event.key !== LEGACY_CONSENT_STORAGE_KEY) return;
     const record = readRecord();
     publish({ record, decided: record !== null, settingsOpen: false });
   });

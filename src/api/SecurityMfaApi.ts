@@ -33,7 +33,7 @@ export function parseMfaStatus(payload: unknown): MfaStatus {
     value.readVerificationSeconds !== 300 || typeof value.setup?.hasPassword !== 'boolean' ||
     typeof value.setup?.emailVerified !== 'boolean' || typeof value.passkeys?.webConfigured !== 'boolean' ||
     typeof value.passkeys?.androidConfigured !== 'boolean')
-    throw new SecurityVerificationError('WIEZ returned an incomplete verification status. Reload your methods before making changes.');
+    throw new SecurityVerificationError('ARU returned an incomplete verification status. Reload your methods before making changes.');
   return value as MfaStatus;
 }
 // These responses contain secrets. Keep them in ephemeral component memory, never a persisted query cache.
@@ -107,7 +107,7 @@ export function mfaErrorMessage(error: unknown): string {
   if (value?.code === 'ERR_CANCELED') return 'Verification cancelled. You can start again when ready.';
   if (value?.code === 'MFA_VERIFICATION_UNAVAILABLE' && typeof value.message === 'string' && value.message.length <= 400) return value.message;
   if (value?.response?.status === 429) return 'Too many attempts. Wait before trying again; avoid repeatedly requesting new codes.';
-  if (!value?.response) return 'WIEZ could not be reached. Check your connection and retry. If setup already finished, reload your methods before starting again.';
+  if (!value?.response) return 'ARU could not be reached. Check your connection and retry. If setup already finished, reload your methods before starting again.';
   const message = value.response.data?.message ?? value.response.data?.data?.message;
   return typeof message === 'string' && message.length <= 400 ? message : 'Verification could not finish. Reload your methods and try again.';
 }

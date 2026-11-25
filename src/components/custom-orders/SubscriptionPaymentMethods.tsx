@@ -54,7 +54,7 @@ export function SubscriptionPaymentMethods({
       <h2 className="text-lg font-semibold">Payment methods</h2>
       <p className="text-sm">
         Use a card already saved from checkout, or securely add a new card when
-        making your next payment. WIEZ shows masked details only. Changing your
+        making your next payment. ARU shows masked details only. Changing your
         default checkout card does not change your renewal card.
       </p>
       <label className="flex min-h-11 items-center gap-3">

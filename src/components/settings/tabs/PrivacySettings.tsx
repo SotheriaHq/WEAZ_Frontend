@@ -32,7 +32,7 @@ export default function PrivacySettings() {
       <div>
         <h1 className="mb-2 text-2xl font-semibold text-[var(--text-primary)]">Privacy</h1>
         <p className="text-[var(--text-secondary)]">
-          Choose what WIEZ may use on this device, and who can see your profile.
+          Choose what ARU may use on this device, and who can see your profile.
         </p>
       </div>
 

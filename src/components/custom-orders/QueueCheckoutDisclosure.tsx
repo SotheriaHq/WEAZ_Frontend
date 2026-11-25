@@ -20,6 +20,6 @@ export function QueuePaymentOutcome({ customOrderIds }: { customOrderIds: string
   if (!ids.length) return null;
   return <section className="queue-section my-4 text-left text-slate-900 dark:text-white"><h2 className="font-bold">🧵 Custom-order queue</h2>
     {query.isPending ? <p role="status">Loading committed queue positions…</p> : query.isError ? <p role="alert">Queue results are not available yet. A waiting lane does not require a second payment. <button className="queue-button" onClick={() => void query.refetch()}>Refresh queue status</button></p> : Object.entries(query.data.orders).map(([id, queue]) => <article className="space-y-2" key={id}><QueueFacts queue={queue} /><Link className="queue-button inline-flex" to={`/custom-orders/${id}`}>Open order</Link></article>)}
-    <p className="text-xs">Payment capture, queue admission and refund processing are confirmed by WIEZ. Retrying this status check does not create a new charge.</p>
+    <p className="text-xs">Payment capture, queue admission and refund processing are confirmed by ARU. Retrying this status check does not create a new charge.</p>
   </section>;
 }

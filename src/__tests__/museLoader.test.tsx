@@ -5,6 +5,8 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { MuseLoader, MuseProgress } from '@/components/loaders/MuseLoader';
+import AruMark from '@/brand/AruMark';
+import AruWordmark from '@/brand/AruWordmark';
 import WiezMark from '@/brand/WiezMark';
 import WiezWordmark from '@/brand/WiezWordmark';
 import { BRAND_ASPECT, BRAND_ASSET_SIZES } from '@/brand/assetSizes';
@@ -86,7 +88,7 @@ describe('the loading system', () => {
       const mask =
         layer.style.getPropertyValue('mask-image') ||
         layer.style.getPropertyValue('-webkit-mask-image');
-      expect(mask).toMatch(/wiez-loader-mark-/);
+      expect(mask).toMatch(/(?:aru|wiez)-loader-mark-/);
     }
 
     /*
@@ -154,8 +156,8 @@ describe('the brand lockup', () => {
     expect(image.getAttribute('srcset')).toContain(`${BRAND_ASSETS.wordmarkLight160} 160w`);
     expect(image.getAttribute('srcset')).toContain(`${BRAND_ASSETS.wordmarkLight320} 320w`);
     expect(image.getAttribute('srcset')).toContain(`${BRAND_ASSETS.wordmarkLight} 720w`);
-    expect(pngSize(BRAND_ASSETS.wordmarkLight160)).toEqual({ width: 160, height: 102 });
-    expect(pngSize(BRAND_ASSETS.wordmarkLight320)).toEqual({ width: 320, height: 205 });
+    expect(pngSize(BRAND_ASSETS.wordmarkLight160)).toEqual({ width: 160, height: 60 });
+    expect(pngSize(BRAND_ASSETS.wordmarkLight320)).toEqual({ width: 320, height: 121 });
   });
 
   it('lays the mark out at the file’s own ratio', () => {
@@ -172,6 +174,19 @@ describe('the brand lockup', () => {
 
     rerender(<WiezMark height={32} title={PRODUCT_NAME} />);
     expect(screen.getByRole('img')).toHaveAccessibleName(PRODUCT_NAME);
+  });
+
+  it('provides canonical AruMark and AruWordmark components with legacy backward compatibility', () => {
+    expect(AruMark).toBe(WiezMark);
+    expect(AruWordmark).toBe(WiezWordmark);
+
+    const { container: aruContainer } = render(<AruWordmark height={28} />);
+    const aruImg = aruContainer.querySelector('img') as HTMLImageElement;
+    expect(aruImg).toHaveAttribute('alt', 'ARU');
+
+    const { container: markContainer } = render(<AruMark height={32} title={PRODUCT_NAME} />);
+    const markImg = markContainer.querySelector('img') as HTMLImageElement;
+    expect(markImg).toHaveAccessibleName('ARU');
   });
 });
 

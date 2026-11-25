@@ -92,7 +92,7 @@ export function QueueFacts({ queue }: { queue?: QueuePresenter | null }) {
             {(serverNow == null
               ? null
               : formatQueueCountdown(queue.queueExpiresAt, serverNow)) ??
-              'Refreshing cancellation deadline from WIEZ'}
+              'Refreshing cancellation deadline from ARU'}
           </span>
           {queue.queueExpiresAt ? (
             <div>
@@ -215,7 +215,7 @@ export function QueueRefundBreakdown({ quote }: { quote: QueueRefundQuote }) {
         <div className="pt-2">
           <dt>Payment reconciliation required</dt>
           <dd>
-            Your cancellation will be recorded. WIEZ must verify the original
+            Your cancellation will be recorded. ARU must verify the original
             payment conversion before submitting the refund.
           </dd>
         </div>

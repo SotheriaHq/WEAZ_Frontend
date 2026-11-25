@@ -168,7 +168,7 @@ const buildSellerReceiptStates = (transaction: IncomingTransaction) => {
     },
     {
       label: 'Escrow recorded',
-      detail: 'WIEZ recorded the funds and prepared them for the release workflow.',
+      detail: 'ARU recorded the funds and prepared them for the release workflow.',
       complete: true,
     },
     {
@@ -1115,7 +1115,7 @@ const FinancePage: React.FC = () => {
                 />
                 <FinanceReceiptList
                   title="Escrow allocation"
-                  subtitle="This shows how the captured order value is split between WIEZ commission, brand release, and the remaining held amount."
+                  subtitle="This shows how the captured order value is split between ARU commission, brand release, and the remaining held amount."
                   rows={heldEscrowAllocationRows}
                   footerNote="Gross tracked in escrow = platform commission + released net + still held net."
                 />

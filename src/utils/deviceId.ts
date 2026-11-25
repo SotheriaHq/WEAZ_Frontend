@@ -19,7 +19,9 @@ import { analyticsPermitted } from '@/privacy/consent';
 
 export const WEB_DEVICE_ID_STORAGE_KEY = 'wiez.market.anonymousSessionId.v1';
 
+export const ARU_DEVICE_ID_HEADER = 'x-aru-device-id';
 export const WIEZ_DEVICE_ID_HEADER = 'x-wiez-device-id';
+export const DEVICE_ID_HEADER = ARU_DEVICE_ID_HEADER;
 
 const createId = () => {
   const random =

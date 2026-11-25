@@ -7,7 +7,7 @@ export function formatQueueCountdown(deadline: string | null | undefined, now: n
   const expiry = deadline ? Date.parse(deadline) : NaN;
   if (!Number.isFinite(expiry) || !Number.isFinite(now)) return null;
   const remaining = expiry - now;
-  if (remaining <= 0) return 'Cancellation due - refreshing from WIEZ';
+  if (remaining <= 0) return 'Cancellation due - refreshing from ARU';
   const minutes = Math.ceil(remaining / 60000);
   if (remaining >= 48 * 3600000) return `Cancels in ${Math.floor(minutes / 1440)}d ${Math.floor((minutes % 1440) / 60)}h`;
   return `Cancels in ${Math.floor(minutes / 60)}h ${minutes % 60}m`;

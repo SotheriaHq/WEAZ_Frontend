@@ -447,10 +447,10 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                 */}
                 <div className="rounded-xl border border-amber-300/70 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
                   <div className="text-sm font-bold text-amber-900 dark:text-amber-100">
-                    How refunds work on WIEZ
+                    How refunds work on ARU
                   </div>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-amber-900/90 dark:text-amber-100/90">
-                    When a shopper is owed a refund, WIEZ pays them immediately —
+                    When a shopper is owed a refund, ARU pays them immediately —
                     they never wait for you to be in funds. If that order had
                     already been released to you, the amount becomes a balance you
                     owe us: your account can go negative, payouts pause until it
@@ -475,7 +475,7 @@ const StoreReviewStep: React.FC<StoreReviewStepProps> = ({
                     className="w-5 h-5 mt-0.5 bg-[color:var(--surface-muted)] dark:bg-[#1a1a1a] border-[color:var(--field-border)] dark:border-gray-700 rounded text-purple-600 focus:ring-purple-500 focus:ring-offset-0"
                   />
                   <span className="text-sm text-[color:var(--text-secondary)] dark:text-gray-400 leading-relaxed">
-                    I agree to WIEZ's{' '}
+                    I agree to ARU's{' '}
                     <a
                       href="/seller-terms"
                       className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"

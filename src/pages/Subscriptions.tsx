@@ -17,7 +17,7 @@ const Subscriptions: React.FC = () => {
       <div className="wiez-card-base wiez-shade-9 rounded-3xl p-6 sm:p-10 relative overflow-hidden">
         <div className="max-w-2xl space-y-3">
           <span className="text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-300">
-            WIEZ Subscriptions
+            ARU Subscriptions
           </span>
           <h1 className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tight">
             Elevate Your Creative Atelier & Client Reach

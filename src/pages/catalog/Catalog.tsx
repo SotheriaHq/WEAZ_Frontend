@@ -610,7 +610,8 @@ const ProfilePage: React.FC = () => {
   }, [isOwner, user, brandProfile]);
 
   useEffect(() => {
-    const DISMISS_KEY = 'wiez.storeSetup.dismissedUntil';
+    const PRIMARY_DISMISS_KEY = 'aru.storeSetup.dismissedUntil';
+    const LEGACY_DISMISS_KEY = 'wiez.storeSetup.dismissedUntil';
     if (!isOwner) {
       setStoreStatus(null);
       setStoreStatusLoading(false);
@@ -618,7 +619,8 @@ const ProfilePage: React.FC = () => {
       return;
     }
 
-    const dismissedUntilRaw = localStorage.getItem(DISMISS_KEY);
+    const dismissedUntilRaw =
+      localStorage.getItem(PRIMARY_DISMISS_KEY) ?? localStorage.getItem(LEGACY_DISMISS_KEY);
     const dismissedUntil = dismissedUntilRaw ? Number(dismissedUntilRaw) : 0;
     setHasDismissedStoreSetup(Boolean(dismissedUntil && dismissedUntil > Date.now()));
   }, [isOwner]);
@@ -652,9 +654,15 @@ const ProfilePage: React.FC = () => {
   }, [hasDismissedStoreSetup, isOwner, storeStatus, storeStatusLoading]);
 
   const dismissStoreSetupNudge = useCallback(() => {
-    const DISMISS_KEY = 'wiez.storeSetup.dismissedUntil';
+    const PRIMARY_DISMISS_KEY = 'aru.storeSetup.dismissedUntil';
+    const LEGACY_DISMISS_KEY = 'wiez.storeSetup.dismissedUntil';
     const until = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
-    localStorage.setItem(DISMISS_KEY, String(until));
+    localStorage.setItem(PRIMARY_DISMISS_KEY, String(until));
+    try {
+      localStorage.removeItem(LEGACY_DISMISS_KEY);
+    } catch {
+      // Best-effort cleanup of legacy key
+    }
     setHasDismissedStoreSetup(true);
   }, []);
 
@@ -2139,13 +2147,13 @@ const ProfilePage: React.FC = () => {
   ]);
 
   const handleShareProfile = useCallback(async () => {
-    const shareBrandName = viewDisplayData.brandName || 'WIEZ';
+    const shareBrandName = viewDisplayData.brandName || 'ARU';
     const url = profileShareUrl;
     if (!url) {
       toast.error('Profile link is not available yet.');
       return;
     }
-    const message = `Check out ${shareBrandName} on WIEZ: ${url}`;
+    const message = `Check out ${shareBrandName} on ARU: ${url}`;
     try {
       if (navigator.share) {
         await navigator.share({
@@ -2357,7 +2365,7 @@ const ProfilePage: React.FC = () => {
       <BrandQrModal
         open={isBrandQrOpen}
         onClose={() => setIsBrandQrOpen(false)}
-        brandName={viewDisplayData.brandName || 'WIEZ Brand'}
+        brandName={viewDisplayData.brandName || 'ARU Brand'}
         qrTargetUrl={profileQrTargetUrl}
         shareUrl={profileShareUrl}
         logoUrl={viewDisplayData.logoImage ?? null}

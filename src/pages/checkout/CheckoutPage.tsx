@@ -1112,8 +1112,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({
     setCheckoutProgressStage('OPENING_SECURE_WINDOW');
     setCheckoutProgressMessage(
       options?.retry
-        ? 'Retrying secure checkout inside WIEZ...'
-        : 'Opening secure checkout inside WIEZ...',
+        ? 'Retrying secure checkout inside ARU...'
+        : 'Opening secure checkout inside ARU...',
     );
 
     await openPaystackInline(plan.accessCode, {

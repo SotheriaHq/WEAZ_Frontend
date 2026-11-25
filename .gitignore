@@ -48,8 +48,7 @@ project-memory/
 memory-bank/
 
 # Local discovery/store regression output
-/test-results/discovery/
-/test-results/store-layout-390.png
+/test-results/
 
 # Local validation scratch files
 .tmp/

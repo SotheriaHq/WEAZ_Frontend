@@ -4,7 +4,7 @@
     var API = "https://api.weaz.me";
     if (!API) return;
     try {
-      if (localStorage.getItem("WIEZ_USER")) return;
+      if (localStorage.getItem("ARU_USER")) return;
     } catch (_e) {}
     var opts = { credentials: 'omit', headers: { Accept: 'application/json' } };
     var early = {};

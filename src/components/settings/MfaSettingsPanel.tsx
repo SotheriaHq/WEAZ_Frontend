@@ -32,7 +32,7 @@ function MfaSetupContent({ mode, flow, onDone, onMethodChange }: {
       </div> : null}
       {mode.kind === 'passkey' || onMethodChange ? <p role="status">{flow.passkeySupport.checking ? 'Checking passkey support…' : flow.passkeySupport.message}</p> : null}
       {mode.kind === 'passkey' ? <>
-        <p>Your device or password manager will ask you to create a passkey. WIEZ never receives your fingerprint, face or device PIN.</p>
+        <p>Your device or password manager will ask you to create a passkey. ARU never receives your fingerprint, face or device PIN.</p>
         <TextField id="mfa-passkey-label" name="passkey-label" label="Passkey name" aria-label="Passkey name" autoComplete="off" value={flow.passkeyLabel} maxLength={80} onChange={event => flow.setPasskeyLabel(event.target.value)} />
       </> : null}
       {mode.kind === 'replace' ? <p>Your current authenticator stays active until the replacement is confirmed.</p> : null}
@@ -59,12 +59,12 @@ function MfaSetupContent({ mode, flow, onDone, onMethodChange }: {
       <TextField id="mfa-totp-code" label="Authenticator code" aria-label="Authenticator code" inputMode="numeric" autoComplete="one-time-code" value={flow.code} maxLength={6} onChange={event => flow.setCode(event.target.value.replace(/\D/g, ''))} />
     </> : null}
     {flow.step === 'passkey' ? <>
-      <p>{flow.passkeyResponse ? 'Your passkey was created on your device. Confirm it with WIEZ to finish setup. If the connection failed, retry confirmation without creating another passkey.' : 'Ready to create your passkey. Press Create passkey to open the secure system prompt. Cancelling keeps your existing methods unchanged.'}</p>
-      {flow.busy ? <p role="status">{flow.passkeyResponse ? 'Confirming your passkey with WIEZ…' : 'Complete or cancel the passkey prompt on your device…'}</p> : null}
+      <p>{flow.passkeyResponse ? 'Your passkey was created on your device. Confirm it with ARU to finish setup. If the connection failed, retry confirmation without creating another passkey.' : 'Ready to create your passkey. Press Create passkey to open the secure system prompt. Cancelling keeps your existing methods unchanged.'}</p>
+      {flow.busy ? <p role="status">{flow.passkeyResponse ? 'Confirming your passkey with ARU…' : 'Complete or cancel the passkey prompt on your device…'}</p> : null}
     </> : null}
     {flow.remainingSeconds !== null ? <p role="status">{flow.expired ? 'This setup has expired. Close it and start again.' : `Setup expires in ${flow.remainingSeconds} seconds.`}</p> : null}
     {flow.step === 'codes' ? <>
-      <p>Save these codes somewhere private before continuing. Each works once. WIEZ cannot show them again.</p>
+      <p>Save these codes somewhere private before continuing. Each works once. ARU cannot show them again.</p>
       <div className="select-text space-y-2 font-mono">{flow.codes.map(code => <p className="break-all" key={code}>{code}</p>)}</div>
       <Button variant="secondary" onClick={async () => {
         try { await navigator.clipboard.writeText(flow.codes.join('\n')); setCopyError(''); }
@@ -100,7 +100,7 @@ export function MfaSetupModal({ mode, isCurrent, onClose, onDone, onMethodChange
   return <Modal open onClose={close} title="Manage verification" size="sm">
     <MfaSetupContent mode={mode} flow={flow} onDone={onDone ?? onClose} onMethodChange={onMethodChange} />
     {warning ? <div role="alert" className="mt-4 space-y-3">
-      <p>Save your recovery codes before closing. WIEZ cannot show them again. If you leave without saving, you can replace them later in security settings.</p>
+      <p>Save your recovery codes before closing. ARU cannot show them again. If you leave without saving, you can replace them later in security settings.</p>
       <div className="flex flex-wrap gap-3"><Button variant="secondary" onClick={() => setWarning(false)}>Keep codes open</Button><Button variant="danger" onClick={onClose}>Close without saving</Button></div>
     </div> : null}
     <Button className="mt-4" variant="secondary" onClick={close}>Close</Button>
@@ -170,7 +170,7 @@ function PhoneSessionVerification({ prompt }: { prompt: SecurityPrompt }) {
     }
   };
   return <div className="space-y-4 break-words">
-    <p>WIEZ flagged the phone session that opened Studio. Verify that phone session first, then resume here. Verifying this Studio session cannot unlock your phone.</p>
+    <p>ARU flagged the phone session that opened Studio. Verify that phone session first, then resume here. Verifying this Studio session cannot unlock your phone.</p>
     <Button loading={busy} disabled={busy} onClick={() => void verify()}>Verify on this phone</Button>
     <Button variant="secondary" disabled={busy} onClick={() => prompt.complete({ actionProof: null })}>I verified the phone; retry Studio</Button>
     {error ? <p role="alert">{error}</p> : null}
