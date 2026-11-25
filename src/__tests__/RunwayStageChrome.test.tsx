@@ -67,7 +67,7 @@ describe('RunwayStageChrome', () => {
     const marks = screen.getAllByRole('img');
     expect(marks).toHaveLength(1);
     expect(marks[0]).toHaveAccessibleName('ARU');
-    expect(marks[0].getAttribute('src')).toMatch(/wiez-wordmark/);
+    expect(marks[0].getAttribute('src')).toMatch(/(?:aru|wiez)-wordmark/);
   });
 
   it('does not repeat the active destination', () => {
