@@ -181,7 +181,7 @@ function MarketComposedHome({
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <h1 className="text-3xl font-extrabold tracking-tight text-[color:var(--wiez-text-primary)] sm:text-4xl">Market</h1>
             <div className="w-full lg:max-w-md">
-              <SearchBarWithSuggestions placeholder="Search designers, Aso-Oke, trench..." className="w-full" />
+              <SearchBarWithSuggestions placeholder="Search designers, Aso-Oke, trench…" className="w-full" />
             </div>
           </div>
 

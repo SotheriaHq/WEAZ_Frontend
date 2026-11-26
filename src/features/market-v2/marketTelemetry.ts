@@ -121,8 +121,6 @@ export function useMarketImpressions(
       { threshold: [0, 0.5] },
     );
     return observerRef.current;
-    // keyOf reads refs only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -154,8 +152,6 @@ export function useMarketImpressions(
         observerRef.current?.unobserve(node);
       };
     },
-    // keyOf reads refs only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [getObserver],
   );
 }

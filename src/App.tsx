@@ -49,6 +49,7 @@ import { GenderPrompt } from '@/components/profile/GenderPrompt';
 import { DeferredOverlay } from '@/components/ui/DeferredOverlay';
 import { selectCartIsDrawerOpen } from '@/features/cartSlice';
 import { selectWishlistIsDrawerOpen } from '@/features/wishlistSlice';
+import { env } from '@/config/env';
 
 const SettingsHome = lazy(() => import('./pages/settings/SettingsHome'));
 const CollectionsSettings = lazy(() => import('./pages/settings/CollectionsSettings'));
@@ -72,6 +73,11 @@ const GlobalModalRouter = lazy(() =>
   })),
 );
 const MarketPlace = lazy(() => import('./pages/MarketPlace'));
+// Server-composed Market behind VITE_MARKET_V2 (off by default). Its chunk is
+// only ever requested when the flag is on; off keeps the established Market.
+const loadMarketHome = (): Promise<{ default: React.ComponentType }> =>
+  env.featureFlags.marketV2 ? import('./pages/MarketComposedPage') : import('./pages/MarketPlace');
+const MarketHome = env.featureFlags.marketV2 ? lazy(loadMarketHome) : MarketPlace;
 const MarketSectionPage = lazy(() => import('./pages/MarketSectionPage'));
 const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
 const Profile = lazy(() => import('./pages/catalog/Catalog'));
@@ -581,7 +587,7 @@ const router = createBrowserRouter([
           { index: true, element: withRouteFallback(<Runway mode="designs" />) },
           { path: 'runway', element: withRouteFallback(<Runway mode="designs" />) },
           // MARKET (commerce discover) is the primary Market surface.
-          { path: 'market', element: withRouteFallback(<MarketPlace />) },
+          { path: 'market', element: withRouteFallback(<MarketHome />) },
           // Legacy alias kept so old /market-place links still open Market.
           { path: 'market-place', element: <Navigate to="/market" replace /> },
           { path: 'market/sections/:sectionKey', element: withRouteFallback(<MarketSectionPage />) },
@@ -1086,7 +1092,7 @@ const HotRouteChunkPrefetch: React.FC = () => {
     // after page load; an idle deadline must never force work onto a busy boot.
     const routes = [
       () => import('./pages/SearchResultsPage'),
-      () => import('./pages/MarketPlace'),
+      loadMarketHome,
       () => import('./pages/catalog/Catalog'),
     ];
     let routeIndex = 0;

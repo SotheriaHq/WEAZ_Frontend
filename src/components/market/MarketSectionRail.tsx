@@ -15,7 +15,6 @@ import {
 import {
   getMarketSectionEmoji,
   resolveMarketSectionFormat,
-  type MarketSectionFormat,
 } from '@/constants/marketSections';
 
 export interface MarketSectionRailProps {
