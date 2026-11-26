@@ -24,6 +24,8 @@ const tokenStorageKey = getEnvVar('VITE_TOKEN_STORAGE_KEY', 'ARU_ACCESS_TOKEN');
 const userStorageKey = getEnvVar('VITE_USER_STORAGE_KEY', 'ARU_USER');
 const brandEndpointsEnabled = parseBoolean(getEnvVar('VITE_ENABLE_BRAND_DETAIL_ENDPOINTS', 'true'));
 const apiWithCredentials = parseBoolean(getEnvVar('VITE_API_WITH_CREDENTIALS', 'true'));
+// Server-composed Market. Proposed flag name, owner confirmation required. Off unless exactly 'true'.
+const marketV2Enabled = parseBoolean(String(import.meta.env.VITE_MARKET_V2 ?? ''));
 const googleClientId = getEnvVar('VITE_GOOGLE_CLIENT_ID', '');
 
 export const env = {
@@ -33,6 +35,7 @@ export const env = {
   userStorageKey,
   featureFlags: {
     brandDetailEndpoints: brandEndpointsEnabled,
+    marketV2: marketV2Enabled,
   },
   google: {
     clientId: googleClientId,
