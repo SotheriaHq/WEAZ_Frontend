@@ -371,7 +371,7 @@ const normalizeMarketSectionsResponse = (data: MarketSectionsResponse): MarketSe
   sections: Array.isArray(data.sections) ? data.sections.map(normalizeMarketSection) : [],
 });
 
-const normalizeMarketSectionDetailResponse = (
+export const normalizeMarketSectionDetailResponse = (
   data: MarketSectionDetailResponse,
 ): MarketSectionDetailResponse => ({
   ...data,
@@ -515,12 +515,27 @@ export interface MarketSignalEvent {
   sessionId?: string | null;
   position?: number | null;
   metadata?: Record<string, unknown>;
+  /**
+   * Optional telemetry, sent only when known. Servers that do not know these
+   * fields refuse the batch, so the queue strips them and resends (see
+   * `marketSignalQueue`).
+   */
+  /** Device-clock instant of the interaction (ISO 8601). */
+  occurredAt?: string;
+  /** Milliseconds the card was visible when the impression was recorded. */
+  visibleMs?: number;
+  /** Feature epoch the item was served from, echoed from the server. */
+  epoch?: string;
+  policyVersion?: string;
+  explore?: boolean;
 }
 
 export interface MarketSignalBatchRequest {
   batchId?: string;
   anonymousSessionId?: string;
   sessionId?: string;
+  /** Device-clock send instant; present only when events carry `occurredAt`. */
+  sentAt?: string;
   events: MarketSignalEvent[];
 }
 

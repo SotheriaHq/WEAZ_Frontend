@@ -222,6 +222,19 @@ export const queryKeys = {
       ['market', 'fallbackProducts', normalizeRecord(params)] as const,
     suggestions: (params?: object | null) =>
       ['market', 'suggestions', normalizeRecord(params)] as const,
+    /*
+      Server-composed Market. Deliberately not persisted to storage: the
+      payloads are private (viewer suppressions), carry short-lived media
+      capabilities and signed cursors that expire with the server epoch.
+    */
+    v2Page: (params?: object | null) =>
+      ['market', 'v2Page', normalizeRecord(params)] as const,
+    v2Catalog: (params?: object | null) =>
+      ['market', 'v2Catalog', normalizeRecord(params)] as const,
+    v2Section: (sectionKey?: string | null, params?: object | null) =>
+      ['market', 'v2Section', normalizeId(sectionKey), normalizeRecord(params)] as const,
+    v2SectionFacets: (sectionKey?: string | null, params?: object | null) =>
+      ['market', 'v2SectionFacets', normalizeId(sectionKey), normalizeRecord(params)] as const,
   },
 };
 

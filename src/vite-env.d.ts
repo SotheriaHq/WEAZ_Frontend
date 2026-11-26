@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_USER_STORAGE_KEY?: string;
   readonly VITE_ENABLE_BRAND_DETAIL_ENDPOINTS?: string;
   readonly VITE_API_WITH_CREDENTIALS?: string;
+  /** Server-composed Market. Proposed name, owner confirmation required. Off by default. */
+  readonly VITE_MARKET_V2?: string;
   readonly VITE_WIEZ_NETWORK_TRACE?: string;
   readonly VITE_PAYSTACK_CARDHOLDER_NAME_MATCH_MODE?: 'strict' | 'soft' | 'off';
 }

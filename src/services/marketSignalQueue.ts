@@ -184,6 +184,8 @@ const buildNoisySignalKey = (event: MarketSignalEvent) =>
     event.targetId,
     event.sectionKey ?? '',
     event.position ?? '',
+    // One impression per card per section per epoch; legacy events carry no epoch.
+    ...(event.epoch ? [event.epoch] : []),
   ].join(':');
 
 export const enqueueWebMarketSignal = (
@@ -228,6 +230,43 @@ export const enqueueWebMarketSignal = (
   return true;
 };
 
+const TELEMETRY_FIELDS = ['occurredAt', 'visibleMs', 'epoch', 'policyVersion', 'explore'] as const;
+const TELEMETRY_REFUSED_STORAGE_KEY = 'aru.market.signalTelemetryRefusedUntil';
+export const WEB_MARKET_SIGNAL_TELEMETRY_REFUSED_TTL_MS = 10 * 60 * 1000;
+let telemetryRefusedUntil = 0;
+
+const hasMarketSignalTelemetry = (event: MarketSignalEvent) =>
+  TELEMETRY_FIELDS.some((field) => event[field] !== undefined);
+
+export const stripMarketSignalTelemetry = (event: MarketSignalEvent): MarketSignalEvent => {
+  if (!hasMarketSignalTelemetry(event)) return event;
+  const copy = { ...event };
+  for (const field of TELEMETRY_FIELDS) delete copy[field];
+  return copy;
+};
+
+const isMarketSignalTelemetryRefused = () => {
+  let stored = 0;
+  try {
+    stored = Number(window.sessionStorage.getItem(TELEMETRY_REFUSED_STORAGE_KEY) ?? 0) || 0;
+  } catch {
+    stored = 0;
+  }
+  return Math.max(stored, telemetryRefusedUntil) > Date.now();
+};
+
+const rememberMarketSignalTelemetryRefused = () => {
+  telemetryRefusedUntil = Date.now() + WEB_MARKET_SIGNAL_TELEMETRY_REFUSED_TTL_MS;
+  try {
+    window.sessionStorage.setItem(TELEMETRY_REFUSED_STORAGE_KEY, String(telemetryRefusedUntil));
+  } catch {
+    // The in-memory memo still applies.
+  }
+};
+
+const isBadRequest = (error: unknown) =>
+  (error as { response?: { status?: number } })?.response?.status === 400;
+
 const getRetryDelay = (retryCount: number) =>
   Math.min(
     WEB_MARKET_SIGNAL_RETRY_BASE_MS * 2 ** Math.max(0, retryCount - 1),
@@ -257,14 +296,33 @@ export const flushWebMarketSignals = async (options?: {
   queue = queue.filter((entry) => !dueIds.has(entry.event.clientEventId));
   persistQueue();
 
-  try {
-    await marketApi.sendMarketSignalBatch({
+  const anonymousSessionId =
+    options?.anonymousSessionId ?? getWebMarketSignalAnonymousSessionId();
+  const sessionId = options?.sessionId ?? due[0]?.event.sessionId ?? undefined;
+  const send = (events: MarketSignalEvent[]) =>
+    marketApi.sendMarketSignalBatch({
       batchId: createWebMarketSignalClientId('market_signal_batch'),
-      anonymousSessionId:
-        options?.anonymousSessionId ?? getWebMarketSignalAnonymousSessionId(),
-      sessionId: options?.sessionId ?? due[0]?.event.sessionId ?? undefined,
-      events: due.map((entry) => entry.event),
+      anonymousSessionId,
+      sessionId,
+      ...(events.some((event) => event.occurredAt) ? { sentAt: new Date().toISOString() } : {}),
+      events,
     });
+
+  try {
+    const telemetryKnown = !isMarketSignalTelemetryRefused();
+    const events = due.map((entry) =>
+      telemetryKnown ? entry.event : stripMarketSignalTelemetry(entry.event),
+    );
+    try {
+      await send(events);
+    } catch (error) {
+      // A server without the optional telemetry fields refuses the whole batch
+      // (unknown properties are rejected). Resend once without them; only when
+      // that succeeds is the refusal remembered.
+      if (!telemetryKnown || !isBadRequest(error) || !events.some(hasMarketSignalTelemetry)) throw error;
+      await send(events.map(stripMarketSignalTelemetry));
+      rememberMarketSignalTelemetryRefused();
+    }
   } catch {
     const retryAt = Date.now();
     const retryEntries = due
@@ -296,6 +354,12 @@ export const __webMarketSignalQueueTestUtils = {
     recentSignalKeys = new Map();
     hydrated = false;
     flushing = false;
+    telemetryRefusedUntil = 0;
+    try {
+      window.sessionStorage.removeItem(TELEMETRY_REFUSED_STORAGE_KEY);
+    } catch {
+      // Storage may be unavailable in the test environment.
+    }
     safeRemoveStorage(WEB_MARKET_SIGNAL_QUEUE_STORAGE_KEY);
     safeRemoveStorage(WEB_MARKET_SIGNAL_RECENT_STORAGE_KEY);
     safeRemoveStorage(WEB_MARKET_SIGNAL_ANONYMOUS_SESSION_STORAGE_KEY);
