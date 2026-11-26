@@ -58,6 +58,9 @@ jobs:
       - name: Product draft save and retry regression
         run: npx vitest run src/features/products/productPublishJob.test.ts
 
+      - name: Composed Market URL state, page merging and fallback regressions
+        run: npx vitest run src/features/market-v2/marketV2.test.ts
+
       - name: Performance regression guard
         run: npm run check:perf-regressions
 
