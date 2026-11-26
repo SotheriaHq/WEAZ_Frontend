@@ -51,6 +51,9 @@ const MENU_GAP = 6;
 const MENU_MIN_HEIGHT = 120;
 const MENU_MAX_HEIGHT = 320;
 
+const enabledOptionNodes = (menu: HTMLElement | null): HTMLElement[] =>
+  Array.from(menu?.querySelectorAll<HTMLElement>('[role="option"]:not([aria-disabled="true"])') ?? []);
+
 const UniversalSelect: React.FC<UniversalSelectProps> = ({
   required,
   label,
@@ -91,6 +94,9 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  /** Opened from the keyboard: focus moves into the list so arrows can choose. */
+  const keyboardOpenRef = useRef(false);
 
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -251,6 +257,60 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
     setIsOpen(false);
   };
 
+  // Keyboard support (additive): ArrowUp/ArrowDown/Home/End move between
+  // enabled options, Enter or Space chooses, Escape or Tab closes, and focus
+  // returns to the trigger whenever a keyboard user leaves the list.
+  useEffect(() => {
+    if (!isOpen || !menuStyle || !keyboardOpenRef.current) return;
+    keyboardOpenRef.current = false;
+    const search = menuRef.current?.querySelector<HTMLInputElement>('input');
+    if (search) {
+      search.focus();
+      return;
+    }
+    const nodes = enabledOptionNodes(menuRef.current);
+    (nodes.find((node) => node.getAttribute('aria-selected') === 'true') ?? nodes[0])?.focus();
+  }, [isOpen, menuStyle]);
+
+  const handleTriggerKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (disabled || isOpen) return;
+    // Enter and Space still open through the button's click.
+    if (event.key === 'Enter' || event.key === ' ') keyboardOpenRef.current = true;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      keyboardOpenRef.current = true;
+      setIsOpen(true);
+    }
+  };
+
+  const handleListKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const nodes = enabledOptionNodes(menuRef.current);
+    const current = nodes.indexOf(document.activeElement as HTMLElement);
+    const focusAt = (index: number) => nodes[(index + nodes.length) % nodes.length]?.focus();
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      focusAt(current + 1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      focusAt(current < 0 ? nodes.length - 1 : current - 1);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      focusAt(0);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      focusAt(nodes.length - 1);
+    } else if ((event.key === 'Enter' || event.key === ' ') && current >= 0) {
+      event.preventDefault();
+      const optionValue = nodes[current].dataset.value;
+      if (optionValue !== undefined) handleSelect(optionValue);
+      triggerRef.current?.focus();
+    } else if (event.key === 'Escape' || event.key === 'Tab') {
+      if (event.key === 'Escape') event.preventDefault();
+      setIsOpen(false);
+      triggerRef.current?.focus();
+    }
+  };
+
   const dropdown =
     isOpen && menuStyle && typeof document !== 'undefined'
       ? createPortal(
@@ -265,6 +325,11 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                   type="text"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'ArrowDown') return;
+                    event.preventDefault();
+                    enabledOptionNodes(menuRef.current)[0]?.focus();
+                  }}
                   placeholder={searchPlaceholder}
                   autoComplete="off"
                   spellCheck={false}
@@ -276,6 +341,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
               role="listbox"
               aria-label={label ?? placeholder}
               className="max-h-56 space-y-1 overflow-y-auto overscroll-contain p-1 pr-1.5 scrollbar-wiez"
+              onKeyDown={handleListKeyDown}
               onWheel={(event) => event.stopPropagation()}
               onTouchMove={(event) => event.stopPropagation()}
             >
@@ -287,6 +353,9 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                     key={option.value}
                     role="option"
                     aria-selected={isSelected}
+                    aria-disabled={optionDisabled || undefined}
+                    tabIndex={-1}
+                    data-value={option.value}
                     onPointerDown={(event) => {
                       // Prevent parent modal focus-trap / backdrop from stealing
                       // the gesture on iPad before click fires.
@@ -299,7 +368,7 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
                       handleSelect(option.value, optionDisabled);
                     }}
                     className={`
-                      relative select-none rounded-xl touch-manipulation ${optionCompact ? 'min-h-[44px] py-2 pl-2.5 pr-8' : 'min-h-[48px] py-2.5 pl-3 pr-9'} transition-colors
+                      relative select-none rounded-xl touch-manipulation outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--wiez-border-focus)] ${optionCompact ? 'min-h-[44px] py-2 pl-2.5 pr-8' : 'min-h-[48px] py-2.5 pl-3 pr-9'} transition-colors
                       ${
                         optionDisabled
                           ? 'opacity-40 cursor-not-allowed text-[color:var(--text-secondary)] bg-transparent'
@@ -378,7 +447,9 @@ const UniversalSelect: React.FC<UniversalSelectProps> = ({
       <div className={fitContent ? 'inline-block' : 'relative w-full'}>
         <button
           type="button"
+          ref={triggerRef}
           onClick={() => !disabled && setIsOpen(!isOpen)}
+          onKeyDown={handleTriggerKeyDown}
           disabled={disabled}
           aria-label={label ?? placeholder}
           aria-haspopup="listbox"

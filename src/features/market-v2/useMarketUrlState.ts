@@ -8,9 +8,10 @@ import {
 
 export interface MarketUrlStateApi extends MarketUrlState {
   /**
-   * Write a new state. A shopper's choice is a new history entry, so Back
-   * walks through their filter changes; corrections the page makes on its own
-   * replace the entry instead.
+   * Write a new state. Filter and sort changes replace the current history
+   * entry (the Market convention: navigation pushes, refinements replace), so
+   * Back leaves the page instead of undoing chips one at a time. Pass
+   * `{ replace: false }` for a change that is a navigation.
    */
   readonly commit: (next: MarketUrlState, options?: { replace?: boolean }) => void;
   /** Some Market parameters in the opened link could not be used. */
@@ -18,6 +19,7 @@ export interface MarketUrlStateApi extends MarketUrlState {
   readonly dismissLinkCorrection: () => void;
 }
 
+/** Filters and sort live in the URL, so reload, Back/Forward and a shared link all restore them. */
 export function useMarketUrlState(): MarketUrlStateApi {
   const [searchParams, setSearchParams] = useSearchParams();
   const parsed = useMemo(() => parseMarketUrlState(searchParams), [searchParams]);
@@ -26,7 +28,7 @@ export function useMarketUrlState(): MarketUrlStateApi {
   const commit = useCallback(
     (next: MarketUrlState, options?: { replace?: boolean }) => {
       setSearchParams((previous) => serializeMarketUrlState(next, previous), {
-        replace: options?.replace ?? false,
+        replace: options?.replace ?? true,
         preventScrollReset: true,
       });
     },
