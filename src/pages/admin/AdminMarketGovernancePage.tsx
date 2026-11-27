@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import AdminBreadcrumb from '@/components/admin/AdminBreadcrumb';
+import MarketSectionPublishingPanel from '@/components/admin/market/MarketSectionPublishingPanel';
 import Modal from '@/components/ui/Modal';
 import UniversalSelect from '@/components/forms/UniversalSelect';
 import { adminMarketGovernanceApi } from '@/api/AdminApi';
@@ -24,6 +25,7 @@ import type {
 type TabKey =
   | 'overview'
   | 'sections'
+  | 'publishing'
   | 'suggestions'
   | 'audit';
 
@@ -80,6 +82,7 @@ type ConfirmState = {
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'overview', label: 'Overview' },
   { key: 'sections', label: 'Market Sections' },
+  { key: 'publishing', label: 'Publishing' },
   { key: 'suggestions', label: 'Suggestion Blocks' },
   { key: 'audit', label: 'Audit Log' },
 ];
@@ -302,6 +305,7 @@ const createSuggestionDraft = (block?: AdminMarketSuggestionBlockConfig): Sugges
 const AdminMarketGovernancePage: React.FC = () => {
   const { hasPermission } = useAdminPermissions();
   const canWrite = hasPermission('MARKET_GOVERNANCE_WRITE');
+  const canRelease = hasPermission('MARKET_GOVERNANCE_RELEASE');
   const canWriteSuggestions = hasPermission('MARKET_SUGGESTIONS_WRITE');
 
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
@@ -836,9 +840,18 @@ const AdminMarketGovernancePage: React.FC = () => {
     </div>
   );
 
+  const renderPublishing = () => (
+    <MarketSectionPublishingPanel
+      sectionKeys={sections.map((section) => section.sectionKey)}
+      canWrite={canWrite}
+      canRelease={canRelease}
+    />
+  );
+
   const currentTab = {
     overview: renderOverview,
     sections: renderSections,
+    publishing: renderPublishing,
     suggestions: renderSuggestions,
     audit: renderAudit,
   }[activeTab];

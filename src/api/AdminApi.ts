@@ -46,6 +46,13 @@ import type {
   AdminMarketSectionConfig,
   AdminMarketSectionConfigCreate,
   AdminMarketSectionConfigUpdate,
+  AdminMarketSectionLifecycle,
+  AdminMarketSectionPreview,
+  AdminMarketSectionPublishResult,
+  AdminMarketSectionSpec,
+  AdminMarketSectionStatusChange,
+  AdminMarketSectionTemplate,
+  AdminMarketSectionVersion,
   AdminMarketSuggestionBlockConfig,
   AdminMarketSuggestionBlockUpsert,
   AdminContentReport,
@@ -747,7 +754,58 @@ export const adminMarketGovernanceApi = {
       '/admin/market-governance/audit-logs',
       { params, signal: options?.signal },
     ),
+
+  // Section publishing. Preview runs the full pipeline, so it gets the long timeout.
+  getSectionTemplates: (options?: RequestOptions) =>
+    apiClient.get<AdminMarketSectionTemplate[]>(
+      '/admin/market-governance/section-templates',
+      { signal: options?.signal },
+    ),
+  getSectionLifecycle: (sectionKey: string, options?: RequestOptions) =>
+    apiClient.get<AdminMarketSectionLifecycle>(
+      `${sectionPath(sectionKey)}/lifecycle`,
+      { signal: options?.signal },
+    ),
+  saveSectionDraft: (
+    sectionKey: string,
+    data: { spec: AdminMarketSectionSpec; expectedRevision: number; reason?: string },
+  ) =>
+    apiClient.put<{ sectionKey: string; draftRevision: number }>(
+      `${sectionPath(sectionKey)}/draft`,
+      data,
+    ),
+  previewSectionDraft: (sectionKey: string) =>
+    apiClient.post<AdminMarketSectionPreview>(
+      `${sectionPath(sectionKey)}/preview`,
+      {},
+      { timeout: SECTION_PREVIEW_TIMEOUT_MS },
+    ),
+  publishSection: (sectionKey: string, data: { draftRevision: number; reason: string }) =>
+    apiClient.post<AdminMarketSectionPublishResult>(`${sectionPath(sectionKey)}/publish`, data),
+  changeSectionStatus: (
+    sectionKey: string,
+    change: AdminMarketSectionStatusChange,
+    reason: string,
+  ) =>
+    apiClient.post<AdminMarketSectionPublishResult>(`${sectionPath(sectionKey)}/${change}`, {
+      reason,
+    }),
+  getSectionVersions: (sectionKey: string, options?: RequestOptions) =>
+    apiClient.get<{ sectionKey: string; items: AdminMarketSectionVersion[] }>(
+      `${sectionPath(sectionKey)}/versions`,
+      { signal: options?.signal },
+    ),
+  restoreSectionVersion: (sectionKey: string, version: number, reason: string) =>
+    apiClient.post<AdminMarketSectionPublishResult>(
+      `${sectionPath(sectionKey)}/restore/${version}`,
+      { reason },
+    ),
 };
+
+const SECTION_PREVIEW_TIMEOUT_MS = 45_000;
+function sectionPath(sectionKey: string): string {
+  return `/admin/market-governance/sections/${encodeURIComponent(sectionKey)}`;
+}
 
 // ── SLA Config ──
 export const adminSlaApi = {

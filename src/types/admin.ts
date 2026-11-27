@@ -1127,6 +1127,83 @@ export type AdminMarketSectionConfigCreate = AdminMarketSectionConfigUpdate & {
   sourceType: NonNullable<AdminMarketSectionConfig['sourceType']>;
 };
 
+// ── Market section publishing (draft → preview → publish) ──
+
+export type AdminMarketSectionSpecStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
+
+/** A pipeline section spec. The server parser owns validation; unknown keys are kept as-is. */
+export type AdminMarketSectionSpec = Record<string, unknown> & {
+  key?: string;
+  version?: number;
+  template?: string;
+  title?: string;
+  subtitle?: string | null;
+  status?: AdminMarketSectionSpecStatus;
+};
+
+export interface AdminMarketSectionTemplate {
+  template: string;
+  title: string;
+  policy: string;
+  entityType: 'PRODUCT' | 'BRAND' | 'CATEGORY' | 'COLLECTION' | 'DESIGN';
+  sorts: string[];
+  signedInOnly: boolean;
+  regional: boolean;
+}
+
+export interface AdminMarketSectionLifecycle {
+  sectionKey: string;
+  draft: { spec: AdminMarketSectionSpec; presentation: Record<string, unknown> } | null;
+  draftRevision: number;
+  published: AdminMarketSectionSpec | null;
+  publishedVersion: number;
+  publishedAt?: string | null;
+  hasUnpublishedDraft: boolean;
+}
+
+export interface AdminMarketSectionPreview {
+  sectionKey: string;
+  draftRevision: number;
+  viewer: 'guest';
+  preview: {
+    title: string;
+    subtitle: string | null;
+    template: string;
+    productList: boolean;
+    fallbackUsed: boolean;
+    fallbackReason: string | null;
+    candidateCount: number;
+    minItems: number;
+    items: Array<{
+      id: string;
+      title: string;
+      entityType: string;
+      imageUrl: string | null;
+      fileId: string | null;
+      price: number | null;
+      currency: string | null;
+    }>;
+  };
+}
+
+export interface AdminMarketSectionVersion {
+  version: number;
+  draftRevision: number;
+  publishedAt: string;
+  publishedById: string | null;
+  reason: string;
+  spec: AdminMarketSectionSpec;
+}
+
+export interface AdminMarketSectionPublishResult {
+  sectionKey: string;
+  version: number;
+  publishedAt: string;
+  status: AdminMarketSectionSpecStatus;
+}
+
+export type AdminMarketSectionStatusChange = 'pause' | 'resume' | 'archive';
+
 export type AdminMarketSuggestionBlockUpsert = Partial<
   Pick<
     AdminMarketSuggestionBlockConfig,
