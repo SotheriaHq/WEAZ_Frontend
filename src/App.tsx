@@ -78,7 +78,9 @@ const MarketPlace = lazy(() => import('./pages/MarketPlace'));
 const loadMarketHome = (): Promise<{ default: React.ComponentType }> =>
   env.featureFlags.marketV2 ? import('./pages/MarketComposedPage') : import('./pages/MarketPlace');
 const MarketHome = env.featureFlags.marketV2 ? lazy(loadMarketHome) : MarketPlace;
-const MarketSectionPage = lazy(() => import('./pages/MarketSectionPage'));
+const MarketSectionPage = lazy(() =>
+  env.featureFlags.marketV2 ? import('./pages/MarketSectionComposedPage') : import('./pages/MarketSectionPage'),
+);
 const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
 const Profile = lazy(() => import('./pages/catalog/Catalog'));
 const CreateDesignPage = lazy(() => import('./pages/catalog/CreateDesign'));
