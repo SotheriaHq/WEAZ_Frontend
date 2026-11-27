@@ -59,6 +59,21 @@ export interface SearchSuggestionResponse {
   tags: SearchSuggestionTag[];
 }
 
+/** How the server read the query (lexicon search only). */
+export interface SearchParsedQuery {
+  attributes: { type: string; value: string; label: string; confidence: number; applied: boolean }[];
+  residual: string;
+  corrections: { from: string; to: string; applied: boolean }[];
+}
+
+/** Product facets over the whole matched set (lexicon search, first page only). */
+export interface SearchProductFacets {
+  color: { value: string; count: number }[];
+  size: { value: string; count: number }[];
+  brand: { id: string; name: string; count: number }[];
+  price: { min: number; max: number; p30: number; p60: number } | null;
+}
+
 export interface SearchResponse {
   query: string;
   normalizedQuery: string;
@@ -70,6 +85,10 @@ export interface SearchResponse {
     limit: number;
     hasNextPage: boolean;
   };
+  /** Present only when the server runs lexicon search for products. */
+  parsed?: SearchParsedQuery;
+  availableSorts?: string[];
+  facets?: SearchProductFacets;
 }
 
 export interface SearchRequestParams {
@@ -78,4 +97,9 @@ export interface SearchRequestParams {
   page?: number;
   limit?: number;
   brandId?: string;
+  /** Lexicon product search: `relevance` when omitted. */
+  sort?: string;
+  /** Canonical catalogue filter encoding (the keys `/market/catalog` takes). */
+  filters?: string;
+  includeFacets?: '1';
 }

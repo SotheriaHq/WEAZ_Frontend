@@ -8,6 +8,12 @@ interface UseSearchParams {
   brandId?: string;
   enabled?: boolean;
   limit?: number;
+  /** Lexicon product search only; the server's relevance order when omitted. */
+  sort?: string | null;
+  /** Canonical catalogue filter encoding; empty for none. */
+  filters?: string;
+  /** Ask for product facets with the first page. */
+  includeFacets?: boolean;
 }
 
 export default function useSearch({
@@ -16,6 +22,9 @@ export default function useSearch({
   brandId,
   enabled = true,
   limit = 20,
+  sort = null,
+  filters = '',
+  includeFacets = false,
 }: UseSearchParams) {
   const [results, setResults] = useState<SearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,13 +34,13 @@ export default function useSearch({
   const lastQueryKey = useRef('');
 
   useEffect(() => {
-    const nextKey = `${query}::${type || 'all'}::${brandId || ''}::${limit}`;
+    const nextKey = `${query}::${type || 'all'}::${brandId || ''}::${limit}::${sort ?? ''}::${filters}::${includeFacets}`;
     if (lastQueryKey.current !== nextKey) {
       lastQueryKey.current = nextKey;
       setPage(1);
       setResults(null);
     }
-  }, [brandId, limit, query, type]);
+  }, [brandId, filters, includeFacets, limit, query, sort, type]);
 
   useEffect(() => {
     if (!enabled || !query.trim()) {
@@ -56,6 +65,10 @@ export default function useSearch({
         page,
         limit,
         brandId,
+        ...(sort ? { sort } : {}),
+        ...(filters ? { filters } : {}),
+        // Facets describe the whole matched set, so only the first page asks.
+        ...(includeFacets && !loadingMore ? { includeFacets: '1' as const } : {}),
       },
       controller.signal,
     )
@@ -68,6 +81,10 @@ export default function useSearch({
           return {
             ...response,
             items: [...current.items, ...response.items],
+            // Later pages carry no facets; keep the first page's view of the query.
+            parsed: current.parsed ?? response.parsed,
+            availableSorts: current.availableSorts ?? response.availableSorts,
+            facets: current.facets ?? response.facets,
           };
         });
       })
@@ -85,7 +102,7 @@ export default function useSearch({
       });
 
     return () => controller.abort();
-  }, [brandId, enabled, limit, page, query, type]);
+  }, [brandId, enabled, filters, includeFacets, limit, page, query, sort, type]);
 
   return {
     results,

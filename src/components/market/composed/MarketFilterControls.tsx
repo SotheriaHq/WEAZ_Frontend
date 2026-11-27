@@ -49,7 +49,8 @@ export function MarketFilterChip({ label, count, pressed, disabled = false, disa
   );
 }
 
-function ChipGroup({
+/** One facet as a chip group; hidden when the facet has no values. */
+export function MarketFacetChipGroup({
   legend,
   options,
   selected,
@@ -103,7 +104,8 @@ function ChipGroup({
   );
 }
 
-function PriceGroup({ filters, facets, onChange }: { filters: MarketFilters; facets: MarketFacets | null; onChange: (next: MarketFilters) => void }) {
+/** Price bands (when the facets have them) and a min/max range form. */
+export function MarketPriceGroup({ filters, facets, onChange }: { filters: MarketFilters; facets: MarketFacets | null; onChange: (next: MarketFilters) => void }) {
   const [min, setMin] = useState(filters.priceMin === null ? '' : String(filters.priceMin));
   const [max, setMax] = useState(filters.priceMax === null ? '' : String(filters.priceMax));
   const [invalid, setInvalid] = useState(false);
@@ -218,7 +220,7 @@ export function MarketFilterControls({ filters, facets, onChange, showAudience =
   return (
     <div className="space-y-6">
       {showAudience ? (
-        <ChipGroup legend="Audience" options={facets?.audience ?? []} selected={filters.audience} canAdd={canAdd} onToggle={list('audience')} />
+        <MarketFacetChipGroup legend="Audience" options={facets?.audience ?? []} selected={filters.audience} canAdd={canAdd} onToggle={list('audience')} />
       ) : null}
       <fieldset className="space-y-2">
         <legend className="text-xs font-bold uppercase tracking-[0.14em] text-[color:var(--wiez-text-secondary)]">How it is made</legend>
@@ -262,15 +264,15 @@ export function MarketFilterControls({ filters, facets, onChange, showAudience =
           />
         </div>
       </fieldset>
-      <PriceGroup key={`${filters.priceMin}-${filters.priceMax}`} filters={filters} facets={facets} onChange={onChange} />
-      <ChipGroup legend="Category" options={facets?.categories ?? []} selected={filters.category} canAdd={canAdd} onToggle={list('category')} />
-      <ChipGroup legend="Garment type" options={types ?? []} selected={filters.type} canAdd={canAdd} onToggle={list('type')} />
-      <ChipGroup legend="Brand" options={facets?.brands ?? []} selected={filters.brand} canAdd={canAdd} onToggle={list('brand')} />
-      <ChipGroup legend="Colour" options={facets?.colors ?? []} selected={filters.color} canAdd={canAdd} onToggle={list('color')} />
-      <ChipGroup legend="Size" options={facets?.sizes ?? []} selected={filters.size} canAdd={canAdd} onToggle={list('size')} />
-      <ChipGroup legend="Tag" options={facets?.tags ?? []} selected={filters.tag} canAdd={canAdd} onToggle={list('tag')} />
+      <MarketPriceGroup key={`${filters.priceMin}-${filters.priceMax}`} filters={filters} facets={facets} onChange={onChange} />
+      <MarketFacetChipGroup legend="Category" options={facets?.categories ?? []} selected={filters.category} canAdd={canAdd} onToggle={list('category')} />
+      <MarketFacetChipGroup legend="Garment type" options={types ?? []} selected={filters.type} canAdd={canAdd} onToggle={list('type')} />
+      <MarketFacetChipGroup legend="Brand" options={facets?.brands ?? []} selected={filters.brand} canAdd={canAdd} onToggle={list('brand')} />
+      <MarketFacetChipGroup legend="Colour" options={facets?.colors ?? []} selected={filters.color} canAdd={canAdd} onToggle={list('color')} />
+      <MarketFacetChipGroup legend="Size" options={facets?.sizes ?? []} selected={filters.size} canAdd={canAdd} onToggle={list('size')} />
+      <MarketFacetChipGroup legend="Tag" options={facets?.tags ?? []} selected={filters.tag} canAdd={canAdd} onToggle={list('tag')} />
       {(facets?.dimensions ?? []).map((dimension) => (
-        <ChipGroup
+        <MarketFacetChipGroup
           key={dimension.key}
           legend={dimension.name}
           options={dimension.values}

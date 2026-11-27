@@ -2,7 +2,15 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import SearchBarWithSuggestions from '@/components/search/SearchBarWithSuggestions';
 import useSearch from '@/hooks/useSearch';
-import type { SearchEntityType, SearchHighlightOffset, SearchItem } from '@/types/search';
+import type { SearchEntityType, SearchHighlightOffset, SearchItem, SearchResponse } from '@/types/search';
+import { env } from '@/config/env';
+import SearchProductRefine from '@/components/search/SearchProductRefine';
+import {
+  clearSearchProductState,
+  readSearchProductState,
+  writeSearchProductState,
+} from '@/features/search/searchProductState';
+import type { MarketFilters, MarketSort } from '@/features/market-v2/marketFilterState';
 import { resolveSearchIntent, resolveSearchResultRoute } from '@/lib/searchRouting';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import MarketSuggestionBlocks from '@/components/market/MarketSuggestionBlocks';
@@ -103,18 +111,40 @@ const SearchResultsPage: React.FC = () => {
   const query = searchParams.get('q') || '';
   const activeType = (searchParams.get('type') as SearchEntityType | 'all' | null) || 'all';
   const [draftQuery, setDraftQuery] = React.useState(query);
+  // Product sort and facets ride the composed Market flag (lexicon search, WP06).
+  const refineProducts = env.featureFlags.marketV2 && activeType === 'product';
+  const productState = React.useMemo(() => readSearchProductState(searchParams), [searchParams]);
   const { results, isLoading, isLoadingMore, error, loadMore } = useSearch({
     query,
     type: activeType,
     enabled: Boolean(query.trim()),
+    sort: refineProducts ? productState.sort : null,
+    filters: refineProducts ? productState.filtersParam : '',
+    includeFacets: refineProducts,
   });
+
+  // Keep the last refinable answer on screen while a refinement loads, so the
+  // filter panel neither unmounts nor shifts the page.
+  const [refineSource, setRefineSource] = React.useState<SearchResponse | null>(null);
+  React.useEffect(() => {
+    if (results?.availableSorts) setRefineSource(results);
+  }, [results]);
+  const refineResults = refineProducts && refineSource?.query === query ? refineSource : null;
 
   React.useEffect(() => {
     setDraftQuery(query);
   }, [query]);
 
+  const updateRefinements = React.useCallback(
+    (next: { filters: MarketFilters; sort: MarketSort | null }) => {
+      setSearchParams((current) => writeSearchProductState(current, next), { replace: true });
+    },
+    [setSearchParams],
+  );
+
   const updateType = (type: SearchEntityType | 'all') => {
-    const next = new URLSearchParams(searchParams);
+    // Product refinements belong to one product search; a tab change drops them.
+    const next = clearSearchProductState(searchParams);
     if (type === 'all') {
       next.delete('type');
     } else {
@@ -127,7 +157,8 @@ const SearchResultsPage: React.FC = () => {
   const submitQuery = (nextQuery: string) => {
     const intent = resolveSearchIntent(nextQuery);
     const trimmed = intent.query;
-    const next = new URLSearchParams(searchParams);
+    // A new query starts unrefined: filters chosen for the last one could hide everything.
+    const next = clearSearchProductState(searchParams);
     if (!trimmed) {
       next.delete('q');
     } else {
@@ -189,6 +220,16 @@ const SearchResultsPage: React.FC = () => {
           <div className="rounded-[2rem] bg-white/70 p-10 text-center text-gray-600 dark:bg-white/5 dark:text-gray-300">
             Enter a search query to explore the catalog.
           </div>
+        ) : null}
+
+        {refineResults ? (
+          <SearchProductRefine
+            results={refineResults}
+            state={productState}
+            total={(results ?? refineResults).counts.product ?? 0}
+            updating={isLoading}
+            onChange={updateRefinements}
+          />
         ) : null}
 
         {isLoading ? (
