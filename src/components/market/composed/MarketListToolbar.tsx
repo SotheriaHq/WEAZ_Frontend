@@ -8,7 +8,7 @@ import {
   type MarketSort,
 } from '@/features/market-v2/marketFilterState';
 import { describeAppliedMarketFilters } from '@/features/market-v2/appliedFilters';
-import { MARKET_SECTION_ORDER_LABEL, MARKET_SORT_LABELS, marketPiecesLabel } from './marketCopy';
+import { MARKET_SORT_LABELS, marketPiecesLabel } from './marketCopy';
 
 export interface MarketListToolbarProps {
   filters: MarketFilters;
@@ -19,8 +19,11 @@ export interface MarketListToolbarProps {
   sort: MarketSort | null;
   /** The sort the server actually applied. */
   sortEffective: string | null;
-  /** See All lists offer their own order as the default. */
-  sectionOrder?: boolean;
+  /**
+   * A list with its own order (a See All section, search relevance) offers it
+   * first under this label; it is what "no sort" means there.
+   */
+  defaultOrderLabel?: string;
   total: number | null;
   updating: boolean;
   onFilters: (next: MarketFilters) => void;
@@ -40,7 +43,7 @@ export function MarketListToolbar({
   availableSorts,
   sort,
   sortEffective,
-  sectionOrder = false,
+  defaultOrderLabel,
   total,
   updating,
   onFilters,
@@ -58,8 +61,8 @@ export function MarketListToolbar({
   const activeCount = countActiveMarketFilters(filters);
   const sortOptions = useMemo(() => {
     const options = availableSorts.map((value) => ({ value, label: MARKET_SORT_LABELS[value] }));
-    return sectionOrder ? [{ value: '', label: MARKET_SECTION_ORDER_LABEL }, ...options] : options;
-  }, [availableSorts, sectionOrder]);
+    return defaultOrderLabel ? [{ value: '', label: defaultOrderLabel }, ...options] : options;
+  }, [availableSorts, defaultOrderLabel]);
   const effective =
     sort ?? (sortEffective && sortOptions.some((option) => option.value === sortEffective) ? sortEffective : '');
   const sortValue = sortOptions.some((option) => option.value === effective) ? effective : sortOptions[0]?.value ?? '';
