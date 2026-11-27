@@ -1028,12 +1028,6 @@ export type AdminMarketSuggestionSourceType =
   | 'CATEGORY'
   | 'MIXED';
 
-export type AdminMarketRankingFormulaStatus =
-  | 'DRAFT'
-  | 'ACTIVE'
-  | 'DEPRECATED'
-  | 'ROLLED_BACK';
-
 export type AdminMarketConfigSource = 'code-default' | 'db' | string;
 
 export interface AdminMarketGovernanceListResponse<T> {
@@ -1073,42 +1067,6 @@ export interface AdminMarketSectionConfig {
   updatedAt?: string | null;
 }
 
-export interface AdminMarketRankingFormulaVersion {
-  id: string;
-  versionKey: string;
-  name: string;
-  status: AdminMarketRankingFormulaStatus;
-  weights: Record<string, number>;
-  bounds: Record<string, unknown> | null;
-  notes: string | null;
-  createdById?: string | null;
-  createdAt: string;
-  activatedAt: string | null;
-  deprecatedAt: string | null;
-}
-
-export interface AdminMarketRankingProfile {
-  id: string;
-  profileKey: string;
-  name: string;
-  description: string | null;
-  enabled: boolean;
-  shadowMode: boolean;
-  sectionKeys: AdminMarketSectionKey[] | string[];
-  formulaVersionId: string | null;
-  formulaVersion?: AdminMarketRankingFormulaVersion | null;
-  explorationPercent: number;
-  brandMaxShare: number;
-  aggregateTimeoutMs: number;
-  rolloutPercent: number;
-  fallbackDeterministic: boolean;
-  metadata: Record<string, unknown> | null;
-  createdById?: string | null;
-  updatedById?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface AdminMarketSuggestionBlockConfig {
   id?: string;
   blockKey: string;
@@ -1134,31 +1092,9 @@ export interface AdminMarketGovernanceReleaseStatus {
   rankingDefaultDisabled: boolean;
   deterministicFallbackEnabled: boolean;
   shadowMode: boolean;
-  activeRankingProfile: AdminMarketRankingProfile | null;
-  activeFormulaVersion: AdminMarketRankingFormulaVersion | null;
   configReadStatus: string;
-  lastRollback: AdminAuditLog | null;
   productionReady: boolean;
   phase14Required: boolean;
-}
-
-export interface AdminMarketGovernanceRollbackResult {
-  rolledBack: boolean;
-  restoredFormulaVersion: AdminMarketRankingFormulaVersion;
-  rolledBackFormulaVersion: AdminMarketRankingFormulaVersion;
-  rankingProfileRollback: string;
-  historyPreserved: boolean;
-}
-
-export interface AdminMarketGovernanceRollbackRehearsal {
-  rehearsalOnly: boolean;
-  mutatesConfig: boolean;
-  deterministicFallbackAvailable: boolean;
-  canRollbackFormula: boolean;
-  activeFormulaVersion: AdminMarketRankingFormulaVersion | null;
-  candidatePriorFormulaVersion: AdminMarketRankingFormulaVersion | null;
-  rankingProfileRollback: string;
-  wouldMutate: string[];
 }
 
 export type AdminMarketSectionConfigUpdate = Partial<
@@ -1190,37 +1126,6 @@ export type AdminMarketSectionConfigCreate = AdminMarketSectionConfigUpdate & {
   title: string;
   sourceType: NonNullable<AdminMarketSectionConfig['sourceType']>;
 };
-
-export type AdminMarketRankingProfileUpsert = Partial<
-  Pick<
-    AdminMarketRankingProfile,
-    | 'name'
-    | 'description'
-    | 'enabled'
-    | 'shadowMode'
-    | 'sectionKeys'
-    | 'formulaVersionId'
-    | 'explorationPercent'
-    | 'brandMaxShare'
-    | 'aggregateTimeoutMs'
-    | 'rolloutPercent'
-    | 'fallbackDeterministic'
-    | 'metadata'
-  >
-> & {
-  profileKey?: string;
-  reason?: string;
-};
-
-export interface AdminMarketRankingFormulaCreate {
-  versionKey: string;
-  name: string;
-  status?: AdminMarketRankingFormulaStatus;
-  weights: Record<string, number>;
-  bounds?: Record<string, unknown>;
-  notes?: string;
-  reason?: string;
-}
 
 export type AdminMarketSuggestionBlockUpsert = Partial<
   Pick<

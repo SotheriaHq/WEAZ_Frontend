@@ -7,15 +7,11 @@ import AdminMarketGovernancePage from './AdminMarketGovernancePage';
 const {
   getReleaseStatus,
   getSections,
-  getRankingProfiles,
-  getRankingFormulas,
   getSuggestionBlocks,
   getAuditLogs,
 } = vi.hoisted(() => ({
   getReleaseStatus: vi.fn(),
   getSections: vi.fn(),
-  getRankingProfiles: vi.fn(),
-  getRankingFormulas: vi.fn(),
   getSuggestionBlocks: vi.fn(),
   getAuditLogs: vi.fn(),
 }));
@@ -24,16 +20,9 @@ vi.mock('@/api/AdminApi', () => ({
   adminMarketGovernanceApi: {
     getReleaseStatus,
     getSections,
-    getRankingProfiles,
-    getRankingFormulas,
     getSuggestionBlocks,
     getAuditLogs,
-    rehearseRollback: vi.fn(),
-    rollbackRanking: vi.fn(),
     updateSection: vi.fn(),
-    createRankingProfile: vi.fn(),
-    updateRankingProfile: vi.fn(),
-    createRankingFormula: vi.fn(),
     createSuggestionBlock: vi.fn(),
     updateSuggestionBlock: vi.fn(),
   },
@@ -87,9 +76,6 @@ describe('AdminMarketGovernancePage', () => {
           phase14Required: true,
           shadowMode: true,
           configReadStatus: 'code-defaults',
-          activeRankingProfile: null,
-          activeFormulaVersion: null,
-          lastRollback: null,
           productionReady: false,
         },
       },
@@ -97,8 +83,6 @@ describe('AdminMarketGovernancePage', () => {
     getSections.mockResolvedValue({
       data: { data: { items: [], configReadStatus: 'code-defaults' } },
     });
-    getRankingProfiles.mockResolvedValue({ data: { data: [] } });
-    getRankingFormulas.mockResolvedValue({ data: { data: [] } });
     getSuggestionBlocks.mockResolvedValue({
       data: { data: { items: [], configReadStatus: 'code-defaults' } },
     });
@@ -126,5 +110,15 @@ describe('AdminMarketGovernancePage', () => {
         'Configurable marketplace rails such as Fresh Drops and Shop by Style. They control labels, limits, order, and View All behavior.',
       ),
     ).toBeTruthy();
+  });
+
+  it('no longer offers ranking profile, formula or rollback controls', async () => {
+    render(<AdminMarketGovernancePage />);
+
+    expect(await screen.findByText('Release Status')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Ranking Profiles/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Formulas$/i })).toBeNull();
+    expect(screen.queryByText(/rollback/i)).toBeNull();
+    expect(screen.queryByText('Active ranking profile')).toBeNull();
   });
 });

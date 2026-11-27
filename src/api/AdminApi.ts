@@ -43,12 +43,6 @@ import type {
   AdminMarketGovernanceAuditLogListResponse,
   AdminMarketGovernanceListResponse,
   AdminMarketGovernanceReleaseStatus,
-  AdminMarketGovernanceRollbackRehearsal,
-  AdminMarketGovernanceRollbackResult,
-  AdminMarketRankingFormulaCreate,
-  AdminMarketRankingFormulaVersion,
-  AdminMarketRankingProfile,
-  AdminMarketRankingProfileUpsert,
   AdminMarketSectionConfig,
   AdminMarketSectionConfigCreate,
   AdminMarketSectionConfigUpdate,
@@ -707,56 +701,6 @@ export const adminMarketGovernanceApi = {
     apiClient.patch<AdminMarketSectionConfig>(
       `/admin/market-governance/sections/${encodeURIComponent(sectionKey)}`,
       data,
-      { signal: options?.signal },
-    ),
-  getRankingProfiles: (options?: RequestOptions) =>
-    apiClient.get<AdminMarketRankingProfile[]>(
-      '/admin/market-governance/ranking/profiles',
-      { signal: options?.signal },
-    ),
-  createRankingProfile: (
-    data: AdminMarketRankingProfileUpsert & { profileKey: string; name: string },
-    options?: RequestOptions,
-  ) =>
-    apiClient.post<AdminMarketRankingProfile>(
-      '/admin/market-governance/ranking/profiles',
-      data,
-      { signal: options?.signal },
-    ),
-  updateRankingProfile: (
-    profileKey: string,
-    data: AdminMarketRankingProfileUpsert,
-    options?: RequestOptions,
-  ) =>
-    apiClient.patch<AdminMarketRankingProfile>(
-      `/admin/market-governance/ranking/profiles/${encodeURIComponent(profileKey)}`,
-      data,
-      { signal: options?.signal },
-    ),
-  getRankingFormulas: (options?: RequestOptions) =>
-    apiClient.get<AdminMarketRankingFormulaVersion[]>(
-      '/admin/market-governance/ranking/formulas',
-      { signal: options?.signal },
-    ),
-  createRankingFormula: (
-    data: AdminMarketRankingFormulaCreate,
-    options?: RequestOptions,
-  ) =>
-    apiClient.post<AdminMarketRankingFormulaVersion>(
-      '/admin/market-governance/ranking/formulas',
-      data,
-      { signal: options?.signal },
-    ),
-  rollbackRanking: (data: { reason?: string }, options?: RequestOptions) =>
-    apiClient.post<AdminMarketGovernanceRollbackResult>(
-      '/admin/market-governance/ranking/rollback',
-      data,
-      { signal: options?.signal },
-    ),
-  rehearseRollback: (options?: RequestOptions) =>
-    apiClient.post<AdminMarketGovernanceRollbackRehearsal>(
-      '/admin/market-governance/rehearse-rollback',
-      {},
       { signal: options?.signal },
     ),
   getSuggestionBlocks: (options?: RequestOptions) =>
