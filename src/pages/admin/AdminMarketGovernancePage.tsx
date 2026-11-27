@@ -10,11 +10,6 @@ import type {
   AdminAuditLog,
   AdminMarketGovernanceListResponse,
   AdminMarketGovernanceReleaseStatus,
-  AdminMarketGovernanceRollbackRehearsal,
-  AdminMarketRankingFormulaStatus,
-  AdminMarketRankingFormulaVersion,
-  AdminMarketRankingProfile,
-  AdminMarketRankingProfileUpsert,
   AdminMarketSectionConfig,
   AdminMarketSectionConfigCreate,
   AdminMarketSectionConfigUpdate,
@@ -29,8 +24,6 @@ import type {
 type TabKey =
   | 'overview'
   | 'sections'
-  | 'profiles'
-  | 'formulas'
   | 'suggestions'
   | 'audit';
 
@@ -55,32 +48,6 @@ type SectionDraft = {
   guestEnabled: boolean;
   requiresAuth: boolean;
   newBrandReservedRatio: string;
-  reason: string;
-};
-
-type ProfileDraft = {
-  mode: 'create' | 'edit';
-  originalKey?: string;
-  profileKey: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  shadowMode: boolean;
-  sectionKeys: string[];
-  formulaVersionId: string;
-  explorationPercent: string;
-  brandMaxShare: string;
-  aggregateTimeoutMs: string;
-  rolloutPercent: string;
-  reason: string;
-};
-
-type FormulaDraft = {
-  versionKey: string;
-  name: string;
-  status: AdminMarketRankingFormulaStatus;
-  weights: Record<string, string>;
-  notes: string;
   reason: string;
 };
 
@@ -113,8 +80,6 @@ type ConfirmState = {
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'overview', label: 'Overview' },
   { key: 'sections', label: 'Market Sections' },
-  { key: 'profiles', label: 'Ranking Profiles' },
-  { key: 'formulas', label: 'Formulas' },
   { key: 'suggestions', label: 'Suggestion Blocks' },
   { key: 'audit', label: 'Audit Log' },
 ];
@@ -175,22 +140,6 @@ const SUGGESTION_SOURCE_TYPES: AdminMarketSuggestionSourceType[] = [
   'MIXED',
 ];
 
-const CREATABLE_FORMULA_STATUSES: AdminMarketRankingFormulaStatus[] = [
-  'DRAFT',
-  'ACTIVE',
-];
-
-const FORMULA_WEIGHT_KEYS = [
-  'section',
-  'sectionRelevance',
-  'freshness',
-  'interaction',
-  'commerce',
-  'exploration',
-  'deterministic',
-  'brandDiversity',
-];
-
 export const MARKET_GOVERNANCE_FIELD_HELP = [
   {
     title: 'Ranking enabled',
@@ -213,20 +162,12 @@ export const MARKET_GOVERNANCE_FIELD_HELP = [
     body: 'Configurable marketplace rails such as Fresh Drops and Shop by Style. They control labels, limits, order, and View All behavior.',
   },
   {
-    title: 'Ranking Profiles',
-    body: 'Named bundles that connect sections, formula versions, rollout percentage, diversity caps, and shadow-mode behavior.',
-  },
-  {
-    title: 'Formulas',
-    body: 'Versioned weight sets for ranking signals. Rollback formula returns to the prior active version when available.',
-  },
-  {
     title: 'Suggestion Blocks',
     body: 'Related-item surfaces for product, collection, brand, search-empty, and section-detail contexts.',
   },
   {
     title: 'Audit Log',
-    body: 'Immutable admin activity trail for governance changes, rehearsal checks, and rollback actions.',
+    body: 'Immutable admin activity trail for governance changes.',
   },
 ];
 
@@ -263,11 +204,6 @@ const normalizeList = <T,>(
 const toInt = (value: string, fallback: number) => {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-const toNumber = (value: string) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -347,39 +283,6 @@ const createSectionDraft = (section?: AdminMarketSectionConfig): SectionDraft =>
   reason: '',
 });
 
-const createProfileDraft = (profile?: AdminMarketRankingProfile): ProfileDraft => ({
-  mode: profile ? 'edit' : 'create',
-  originalKey: profile?.profileKey,
-  profileKey: profile?.profileKey ?? '',
-  name: profile?.name ?? '',
-  description: profile?.description ?? '',
-  enabled: profile?.enabled ?? false,
-  shadowMode: profile?.shadowMode ?? true,
-  sectionKeys: [...(profile?.sectionKeys ?? [])],
-  formulaVersionId: profile?.formulaVersionId ?? '',
-  explorationPercent: String(profile?.explorationPercent ?? 10),
-  brandMaxShare: String(profile?.brandMaxShare ?? 35),
-  aggregateTimeoutMs: String(profile?.aggregateTimeoutMs ?? 150),
-  rolloutPercent: String(profile?.rolloutPercent ?? 0),
-  reason: '',
-});
-
-const createFormulaDraft = (): FormulaDraft => ({
-  versionKey: '',
-  name: '',
-  status: 'DRAFT',
-  weights: {
-    freshness: '0.35',
-    interaction: '0.2',
-    commerce: '0.15',
-    sectionRelevance: '0.15',
-    deterministic: '0.1',
-    brandDiversity: '0.05',
-  },
-  notes: '',
-  reason: '',
-});
-
 const createSuggestionDraft = (block?: AdminMarketSuggestionBlockConfig): SuggestionDraft => ({
   mode: block ? 'edit' : 'create',
   originalKey: block?.blockKey,
@@ -399,9 +302,6 @@ const createSuggestionDraft = (block?: AdminMarketSuggestionBlockConfig): Sugges
 const AdminMarketGovernancePage: React.FC = () => {
   const { hasPermission } = useAdminPermissions();
   const canWrite = hasPermission('MARKET_GOVERNANCE_WRITE');
-  const canRelease = hasPermission('MARKET_GOVERNANCE_RELEASE');
-  const canWriteFormula = hasPermission('MARKET_RANKING_FORMULA_WRITE');
-  const canRollback = hasPermission('MARKET_RANKING_ROLLBACK');
   const canWriteSuggestions = hasPermission('MARKET_SUGGESTIONS_WRITE');
 
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
@@ -411,35 +311,17 @@ const AdminMarketGovernancePage: React.FC = () => {
   const [releaseStatus, setReleaseStatus] = useState<AdminMarketGovernanceReleaseStatus | null>(null);
   const [sections, setSections] = useState<AdminMarketSectionConfig[]>([]);
   const [sectionReadStatus, setSectionReadStatus] = useState<string | null>(null);
-  const [profiles, setProfiles] = useState<AdminMarketRankingProfile[]>([]);
-  const [formulas, setFormulas] = useState<AdminMarketRankingFormulaVersion[]>([]);
   const [suggestionBlocks, setSuggestionBlocks] = useState<AdminMarketSuggestionBlockConfig[]>([]);
   const [suggestionReadStatus, setSuggestionReadStatus] = useState<string | null>(null);
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
   const [auditNextCursor, setAuditNextCursor] = useState<string | null>(null);
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
-  const [rehearsalResult, setRehearsalResult] =
-    useState<AdminMarketGovernanceRollbackRehearsal | null>(null);
 
   const [editingSection, setEditingSection] = useState<AdminMarketSectionConfig | null>(null);
   const [sectionDraft, setSectionDraft] = useState<SectionDraft | null>(null);
-  const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(null);
-  const [formulaDraft, setFormulaDraft] = useState<FormulaDraft | null>(null);
   const [suggestionDraft, setSuggestionDraft] = useState<SuggestionDraft | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [confirmReason, setConfirmReason] = useState('');
-
-  const formulaOptions = useMemo(
-    () => [
-      { value: '', label: 'No formula selected' },
-      ...formulas.map((formula) => ({
-        value: formula.id,
-        label: `${formula.name} (${formula.versionKey})`,
-        description: formula.status,
-      })),
-    ],
-    [formulas],
-  );
 
   const sectionOptions = useMemo(() => {
     const byKey = new Map<string, { value: string; label: string; description?: string }>();
@@ -471,15 +353,11 @@ const AdminMarketGovernancePage: React.FC = () => {
         const [
           releaseResponse,
           sectionResponse,
-          profileResponse,
-          formulaResponse,
           suggestionResponse,
           auditResponse,
         ] = await Promise.all([
           adminMarketGovernanceApi.getReleaseStatus({ signal }),
           adminMarketGovernanceApi.getSections({ signal }),
-          adminMarketGovernanceApi.getRankingProfiles({ signal }),
-          adminMarketGovernanceApi.getRankingFormulas({ signal }),
           adminMarketGovernanceApi.getSuggestionBlocks({ signal }),
           adminMarketGovernanceApi.getAuditLogs({ limit: 25 }, { signal }),
         ]);
@@ -497,8 +375,6 @@ const AdminMarketGovernancePage: React.FC = () => {
         setReleaseStatus(unwrap<AdminMarketGovernanceReleaseStatus>(releaseResponse.data));
         setSections(sectionPayload.items);
         setSectionReadStatus(sectionPayload.configReadStatus ?? null);
-        setProfiles(unwrap<AdminMarketRankingProfile[]>(profileResponse.data));
-        setFormulas(unwrap<AdminMarketRankingFormulaVersion[]>(formulaResponse.data));
         setSuggestionBlocks(suggestionPayload.items);
         setSuggestionReadStatus(suggestionPayload.configReadStatus ?? null);
         setAuditLogs(auditPayload.items);
@@ -625,87 +501,6 @@ const AdminMarketGovernancePage: React.FC = () => {
     void saveSection();
   };
 
-  const saveProfile = async () => {
-    if (!profileDraft) return;
-    if (!profileDraft.name.trim()) {
-      toast.error('Ranking profile name is required.');
-      return;
-    }
-    if (profileDraft.mode === 'create' && !profileDraft.profileKey.trim()) {
-      toast.error('Ranking profile key is required.');
-      return;
-    }
-    const payload: AdminMarketRankingProfileUpsert = {
-      name: profileDraft.name.trim(),
-      description: profileDraft.description.trim() || null,
-      enabled: profileDraft.enabled,
-      shadowMode: profileDraft.shadowMode,
-      sectionKeys: profileDraft.sectionKeys,
-      formulaVersionId: profileDraft.formulaVersionId || null,
-      explorationPercent: toInt(profileDraft.explorationPercent, 10),
-      brandMaxShare: toInt(profileDraft.brandMaxShare, 35),
-      aggregateTimeoutMs: toInt(profileDraft.aggregateTimeoutMs, 150),
-      rolloutPercent: 0,
-      fallbackDeterministic: true,
-      reason: profileDraft.reason.trim() || undefined,
-    };
-    await runMutation(
-      `profile:${profileDraft.originalKey ?? 'new'}`,
-      async () => {
-        if (profileDraft.mode === 'create') {
-          await adminMarketGovernanceApi.createRankingProfile({
-            ...payload,
-            profileKey: profileDraft.profileKey.trim(),
-            name: profileDraft.name.trim(),
-          });
-        } else if (profileDraft.originalKey) {
-          await adminMarketGovernanceApi.updateRankingProfile(profileDraft.originalKey, payload);
-        }
-        setProfileDraft(null);
-      },
-      'Ranking profile saved.',
-    );
-  };
-
-  const saveFormula = async () => {
-    if (!formulaDraft) return;
-    if (!formulaDraft.versionKey.trim() || !formulaDraft.name.trim()) {
-      toast.error('Formula key and name are required.');
-      return;
-    }
-    const weights: Record<string, number> = {};
-    for (const [key, value] of Object.entries(formulaDraft.weights)) {
-      if (!value.trim()) continue;
-      const numeric = toNumber(value);
-      if (numeric === null || numeric < 0 || numeric > 1) {
-        toast.error(`Weight ${humanize(key)} must be a finite number from 0 to 1.`);
-        return;
-      }
-      weights[key] = numeric;
-    }
-    if (!Object.keys(weights).length) {
-      toast.error('At least one formula weight is required.');
-      return;
-    }
-    await runMutation(
-      'formula:new',
-      async () => {
-        await adminMarketGovernanceApi.createRankingFormula({
-          versionKey: formulaDraft.versionKey.trim(),
-          name: formulaDraft.name.trim(),
-          status: formulaDraft.status,
-          weights,
-          notes: formulaDraft.notes.trim() || undefined,
-          reason: formulaDraft.reason.trim() || undefined,
-        });
-        setFormulaDraft(null);
-      },
-      formulaDraft.status === 'ACTIVE'
-        ? 'Formula created and activated.'
-        : 'Formula version created.',
-    );
-  };
-
   const saveSuggestionBlock = async () => {
     if (!suggestionDraft) return;
     if (!suggestionDraft.title.trim()) {
@@ -749,46 +544,6 @@ const AdminMarketGovernancePage: React.FC = () => {
     );
   };
 
-  const openRollbackRehearsal = () => {
-    setConfirmState({
-      title: 'Run rollback rehearsal?',
-      message:
-        'This check is non-mutating. It verifies whether deterministic fallback and formula rollback paths are available.',
-      confirmLabel: 'Run rehearsal',
-      onConfirm: async () => {
-        await runMutation(
-          'rollback:rehearse',
-          async () => {
-            const response = await adminMarketGovernanceApi.rehearseRollback();
-            setRehearsalResult(unwrap<AdminMarketGovernanceRollbackRehearsal>(response.data));
-          },
-          'Rollback rehearsal completed.',
-        );
-      },
-    });
-  };
-
-  const openRollback = () => {
-    setConfirmState({
-      title: 'Rollback active ranking formula?',
-      message:
-        'Rollback preserves formula history and restores the prior deprecated formula if one exists. Ranking flags remain backend-controlled.',
-      confirmLabel: 'Rollback formula',
-      destructive: true,
-      reasonRequired: true,
-      reasonPlaceholder: 'Why is this rollback needed?',
-      onConfirm: async (reason) => {
-        await runMutation(
-          'rollback:apply',
-          async () => {
-            await adminMarketGovernanceApi.rollbackRanking({ reason });
-          },
-          'Ranking formula rollback completed.',
-        );
-      },
-    });
-  };
-
   const confirm = async () => {
     if (!confirmState) return;
     if (confirmState.reasonRequired && !confirmReason.trim()) {
@@ -812,24 +567,6 @@ const AdminMarketGovernancePage: React.FC = () => {
               Governance settings are available for controlled configuration. Release readiness still requires
               Phase 14 validation, monitoring, and final signoff.
             </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={openRollbackRehearsal}
-              disabled={!canRelease || busyKey === 'rollback:rehearse'}
-              className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/[0.06]"
-            >
-              Rehearse rollback
-            </button>
-            <button
-              type="button"
-              onClick={openRollback}
-              disabled={!canRollback || busyKey === 'rollback:apply'}
-              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
-            >
-              Rollback formula
-            </button>
           </div>
         </div>
 
@@ -886,21 +623,6 @@ const AdminMarketGovernancePage: React.FC = () => {
             hint="Shows whether this page is reading database governance config or code defaults."
           />
           <KeyValue
-            label="Active ranking profile"
-            value={releaseStatus?.activeRankingProfile?.profileKey ?? 'None'}
-            hint="The profile that would connect sections, formula, rollout, and diversity limits."
-          />
-          <KeyValue
-            label="Active formula"
-            value={releaseStatus?.activeFormulaVersion?.versionKey ?? 'None'}
-            hint="The active ranking weight version, if any."
-          />
-          <KeyValue
-            label="Last rollback"
-            value={releaseStatus?.lastRollback ? formatDateTime(releaseStatus.lastRollback.createdAt) : 'None'}
-            hint="Most recent governance rollback audit entry."
-          />
-          <KeyValue
             label="Release readiness"
             value={releaseStatus?.productionReady ? 'Needs Phase 14 confirmation' : 'Not cleared'}
             hint="Not cleared means do not treat ranking as production-ready."
@@ -911,7 +633,7 @@ const AdminMarketGovernancePage: React.FC = () => {
       <div className={panelClass}>
         <h3 className="text-sm font-bold text-slate-950 dark:text-white">What this page controls</h3>
         <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
-          These controls govern marketplace section configuration and ranking rollout safety. They do not enable ranking for production unless the release gate and backend flags allow it.
+          These controls govern marketplace section configuration and suggestion blocks. They do not enable ranking for production unless the release gate and backend flags allow it.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {MARKET_GOVERNANCE_FIELD_HELP.map((item) => (
@@ -928,23 +650,6 @@ const AdminMarketGovernancePage: React.FC = () => {
         </div>
       </div>
 
-      {rehearsalResult ? (
-        <div className={panelClass}>
-          <h3 className="text-sm font-bold text-slate-950 dark:text-white">Latest rollback rehearsal</h3>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <KeyValue label="Mutates config" value={rehearsalResult.mutatesConfig ? 'Yes' : 'No'} />
-            <KeyValue
-              label="Deterministic fallback"
-              value={rehearsalResult.deterministicFallbackAvailable ? 'Available' : 'Unavailable'}
-            />
-            <KeyValue label="Formula rollback" value={rehearsalResult.canRollbackFormula ? 'Available' : 'Unavailable'} />
-            <KeyValue
-              label="Candidate prior formula"
-              value={rehearsalResult.candidatePriorFormulaVersion?.versionKey ?? 'None'}
-            />
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 
@@ -1013,127 +718,6 @@ const AdminMarketGovernancePage: React.FC = () => {
           </div>
         ))}
         {!sections.length && !loading ? <EmptyState label="No market section configs returned." /> : null}
-      </div>
-    </div>
-  );
-
-  const renderProfiles = () => (
-    <div className="space-y-4">
-      <TabHeader
-        title="Ranking Profiles"
-        description="Create and adjust aggregate ranking profiles without turning off deterministic fallback. Rollout remains locked at 0 before Phase 14."
-        action={
-          canWrite ? (
-            <button
-              type="button"
-              onClick={() => setProfileDraft(createProfileDraft())}
-              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 dark:bg-white dark:text-slate-950"
-            >
-              Create profile
-            </button>
-          ) : null
-        }
-      />
-      <div className="grid gap-3">
-        {profiles.map((profile) => (
-          <div key={profile.id} className={panelClass}>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-950 dark:text-white">{profile.name}</h3>
-                  <StatusPill tone={profile.enabled ? 'warn' : 'safe'}>
-                    {profile.enabled ? 'Enabled profile' : 'Disabled profile'}
-                  </StatusPill>
-                  <StatusPill tone={profile.shadowMode ? 'safe' : 'warn'}>
-                    Shadow {profile.shadowMode ? 'on' : 'off'}
-                  </StatusPill>
-                </div>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                  {profile.description || 'No description'}
-                </p>
-                <p className="mt-2 text-xs font-mono text-slate-500">{profile.profileKey}</p>
-              </div>
-              {canWrite ? (
-                <button
-                  type="button"
-                  onClick={() => setProfileDraft(createProfileDraft(profile))}
-                  className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-white/15 dark:text-slate-200 dark:hover:bg-white/[0.06]"
-                >
-                  Edit
-                </button>
-              ) : null}
-            </div>
-            <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-              <KeyValue label="Sections" value={profile.sectionKeys?.join(', ') || 'None'} />
-              <KeyValue label="Formula" value={profile.formulaVersion?.versionKey ?? 'None'} />
-              <KeyValue label="Exploration" value={`${profile.explorationPercent}%`} />
-              <KeyValue label="Brand max share" value={`${profile.brandMaxShare}%`} />
-              <KeyValue label="Aggregate timeout" value={`${profile.aggregateTimeoutMs} ms`} />
-              <KeyValue label="Rollout" value={`${profile.rolloutPercent}%`} />
-              <KeyValue label="Fallback locked" value={profile.fallbackDeterministic ? 'Yes' : 'Needs review'} />
-              <KeyValue label="Updated" value={formatDateTime(profile.updatedAt)} />
-            </div>
-          </div>
-        ))}
-        {!profiles.length && !loading ? <EmptyState label="No ranking profiles created yet." /> : null}
-      </div>
-    </div>
-  );
-
-  const renderFormulas = () => (
-    <div className="space-y-4">
-      <TabHeader
-        title="Formula Versions"
-        description="Create bounded formula versions with allowlisted weights. Creating an ACTIVE formula deprecates the prior active formula through the backend transaction."
-        action={
-          canWriteFormula ? (
-            <button
-              type="button"
-              onClick={() => setFormulaDraft(createFormulaDraft())}
-              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 dark:bg-white dark:text-slate-950"
-            >
-              Create formula
-            </button>
-          ) : null
-        }
-      />
-      <div className="grid gap-3">
-        {formulas.map((formula) => (
-          <details key={formula.id} className={panelClass}>
-            <summary className="cursor-pointer list-none">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-950 dark:text-white">{formula.name}</h3>
-                    <StatusPill tone={formula.status === 'ACTIVE' ? 'warn' : 'neutral'}>
-                      {humanize(formula.status)}
-                    </StatusPill>
-                  </div>
-                  <p className="mt-2 text-xs font-mono text-slate-500">{formula.versionKey}</p>
-                </div>
-                <div className="grid gap-2 text-sm sm:grid-cols-2 lg:min-w-[360px]">
-                  <KeyValue label="Created" value={formatDateTime(formula.createdAt)} />
-                  <KeyValue label="Activated" value={formatDateTime(formula.activatedAt)} />
-                </div>
-              </div>
-            </summary>
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-black/20">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Weights</p>
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs text-slate-700 dark:text-slate-200">
-                  {JSON.stringify(formula.weights, null, 2)}
-                </pre>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 dark:border-white/10 dark:bg-black/20">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Bounds and notes</p>
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs text-slate-700 dark:text-slate-200">
-                  {JSON.stringify({ bounds: formula.bounds, notes: formula.notes }, null, 2)}
-                </pre>
-              </div>
-            </div>
-          </details>
-        ))}
-        {!formulas.length && !loading ? <EmptyState label="No formula versions created yet." /> : null}
       </div>
     </div>
   );
@@ -1255,8 +839,6 @@ const AdminMarketGovernancePage: React.FC = () => {
   const currentTab = {
     overview: renderOverview,
     sections: renderSections,
-    profiles: renderProfiles,
-    formulas: renderFormulas,
     suggestions: renderSuggestions,
     audit: renderAudit,
   }[activeTab];
@@ -1270,9 +852,8 @@ const AdminMarketGovernancePage: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold text-slate-950 dark:text-white">Market Governance</h1>
             <p className="mt-1 max-w-3xl text-sm text-slate-600 dark:text-slate-300">
-              Configure market sections, aggregate ranking profiles, formula versions, suggestion blocks,
-              rollback checks, and audit review. Ranking remains backend-disabled unless the release gate
-              explicitly changes it later.
+              Configure market sections, suggestion blocks, and audit review. Ranking remains
+              backend-disabled unless the release gate explicitly changes it later.
             </p>
           </div>
           <button
@@ -1345,24 +926,6 @@ const AdminMarketGovernancePage: React.FC = () => {
           sectionDraft &&
             busyKey === `section:${(sectionDraft.originalKey ?? sectionDraft.sectionKey) || 'new'}`,
         )}
-      />
-
-      <ProfileModal
-        draft={profileDraft}
-        setDraft={setProfileDraft}
-        formulaOptions={formulaOptions}
-        sectionOptions={sectionOptions}
-        onClose={() => setProfileDraft(null)}
-        onSave={() => void saveProfile()}
-        busy={Boolean(profileDraft && busyKey === `profile:${profileDraft.originalKey ?? 'new'}`)}
-      />
-
-      <FormulaModal
-        draft={formulaDraft}
-        setDraft={setFormulaDraft}
-        onClose={() => setFormulaDraft(null)}
-        onSave={() => void saveFormula()}
-        busy={busyKey === 'formula:new'}
       />
 
       <SuggestionModal
@@ -1610,195 +1173,6 @@ const SectionModal: React.FC<{
           busy={busy}
           saveLabel={draft.mode === 'create' ? 'Create section' : 'Save section'}
         />
-      </div>
-    ) : null}
-  </Modal>
-);
-
-const ProfileModal: React.FC<{
-  draft: ProfileDraft | null;
-  setDraft: React.Dispatch<React.SetStateAction<ProfileDraft | null>>;
-  formulaOptions: Array<{ value: string; label: string; description?: string }>;
-  sectionOptions: Array<{ value: string; label: string; description?: string }>;
-  onClose: () => void;
-  onSave: () => void;
-  busy: boolean;
-}> = ({ draft, setDraft, formulaOptions, sectionOptions, onClose, onSave, busy }) => (
-  <Modal open={Boolean(draft)} onClose={onClose} title={draft?.mode === 'create' ? 'Create ranking profile' : 'Edit ranking profile'} size="xl">
-    {draft ? (
-      <div className="space-y-4">
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          Deterministic fallback stays locked on, and rollout remains 0 until the final release gate.
-        </p>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Profile key">
-            <input
-              value={draft.profileKey}
-              onChange={(event) => setDraft((current) => current && { ...current, profileKey: event.target.value })}
-              disabled={draft.mode === 'edit'}
-              className={inputClass}
-              maxLength={80}
-            />
-          </Field>
-          <Field label="Name">
-            <input
-              value={draft.name}
-              onChange={(event) => setDraft((current) => current && { ...current, name: event.target.value })}
-              className={inputClass}
-              maxLength={120}
-            />
-          </Field>
-          <div className="md:col-span-2">
-            <Field label="Description">
-              <textarea
-                value={draft.description}
-                onChange={(event) => setDraft((current) => current && { ...current, description: event.target.value })}
-                className={`${inputClass} min-h-[80px] resize-y`}
-                maxLength={500}
-              />
-            </Field>
-          </div>
-          <UniversalSelect
-            label="Formula version"
-            value={draft.formulaVersionId}
-            onChange={(value) => setDraft((current) => current && { ...current, formulaVersionId: value })}
-            options={formulaOptions}
-            searchable
-          />
-          <NumberField label="Exploration percent" value={draft.explorationPercent} min={0} max={25} onChange={(value) => setDraft((current) => current && { ...current, explorationPercent: value })} />
-          <NumberField label="Brand max share" value={draft.brandMaxShare} min={10} max={50} onChange={(value) => setDraft((current) => current && { ...current, brandMaxShare: value })} />
-          <NumberField label="Aggregate timeout ms" value={draft.aggregateTimeoutMs} min={25} max={500} onChange={(value) => setDraft((current) => current && { ...current, aggregateTimeoutMs: value })} />
-          <NumberField label="Rollout percent" value={draft.rolloutPercent} min={0} max={0} onChange={(value) => setDraft((current) => current && { ...current, rolloutPercent: value })} disabled hint="Locked at 0 before Phase 14." />
-          <CheckboxField label="Profile enabled" checked={draft.enabled} onChange={(enabled) => setDraft((current) => current && { ...current, enabled })} />
-          <CheckboxField label="Shadow mode" checked={draft.shadowMode} onChange={(shadowMode) => setDraft((current) => current && { ...current, shadowMode })} />
-          <CheckboxField label="Deterministic fallback locked" checked disabled onChange={() => undefined} />
-          <div className="md:col-span-2">
-            <Field label="Section allowlist">
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {sectionOptions.map((option) => (
-                  <label key={option.value} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm dark:border-white/10">
-                    <input
-                      type="checkbox"
-                      checked={draft.sectionKeys.includes(option.value)}
-                      onChange={(event) =>
-                        setDraft((current) => {
-                          if (!current) return current;
-                          const next = new Set(current.sectionKeys);
-                          if (event.target.checked) next.add(option.value);
-                          else next.delete(option.value);
-                          return { ...current, sectionKeys: Array.from(next) };
-                        })
-                      }
-                    />
-                    <span>
-                      {option.label}
-                      {option.description ? (
-                        <span className="block text-xs text-slate-500 dark:text-slate-400">
-                          {option.description}
-                        </span>
-                      ) : null}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </Field>
-          </div>
-          <div className="md:col-span-2">
-            <Field label="Reason">
-              <textarea
-                value={draft.reason}
-                onChange={(event) => setDraft((current) => current && { ...current, reason: event.target.value })}
-                className={`${inputClass} min-h-[80px] resize-y`}
-                maxLength={500}
-              />
-            </Field>
-          </div>
-        </div>
-        <ModalActions onClose={onClose} onSave={onSave} busy={busy} saveLabel="Save profile" />
-      </div>
-    ) : null}
-  </Modal>
-);
-
-const FormulaModal: React.FC<{
-  draft: FormulaDraft | null;
-  setDraft: React.Dispatch<React.SetStateAction<FormulaDraft | null>>;
-  onClose: () => void;
-  onSave: () => void;
-  busy: boolean;
-}> = ({ draft, setDraft, onClose, onSave, busy }) => (
-  <Modal open={Boolean(draft)} onClose={onClose} title="Create formula version" size="xl">
-    {draft ? (
-      <div className="space-y-4">
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          Use allowlisted numeric weights from 0 to 1. The backend validates all bounds again before saving.
-        </p>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Version key">
-            <input
-              value={draft.versionKey}
-              onChange={(event) => setDraft((current) => current && { ...current, versionKey: event.target.value })}
-              className={inputClass}
-              maxLength={80}
-            />
-          </Field>
-          <Field label="Name">
-            <input
-              value={draft.name}
-              onChange={(event) => setDraft((current) => current && { ...current, name: event.target.value })}
-              className={inputClass}
-              maxLength={120}
-            />
-          </Field>
-          <UniversalSelect
-            label="Status"
-            value={draft.status}
-            onChange={(value) => setDraft((current) => current && { ...current, status: value as AdminMarketRankingFormulaStatus })}
-            options={CREATABLE_FORMULA_STATUSES.map((status) => ({ value: status, label: humanize(status) }))}
-          />
-          <div className="md:col-span-2">
-            <Field label="Weights">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {FORMULA_WEIGHT_KEYS.map((key) => (
-                  <NumberField
-                    key={key}
-                    label={humanize(key)}
-                    value={draft.weights[key] ?? ''}
-                    min={0}
-                    max={1}
-                    step="0.01"
-                    onChange={(value) =>
-                      setDraft((current) =>
-                        current ? { ...current, weights: { ...current.weights, [key]: value } } : current,
-                      )
-                    }
-                  />
-                ))}
-              </div>
-            </Field>
-          </div>
-          <div className="md:col-span-2">
-            <Field label="Notes">
-              <textarea
-                value={draft.notes}
-                onChange={(event) => setDraft((current) => current && { ...current, notes: event.target.value })}
-                className={`${inputClass} min-h-[80px] resize-y`}
-                maxLength={2000}
-              />
-            </Field>
-          </div>
-          <div className="md:col-span-2">
-            <Field label="Reason">
-              <textarea
-                value={draft.reason}
-                onChange={(event) => setDraft((current) => current && { ...current, reason: event.target.value })}
-                className={`${inputClass} min-h-[80px] resize-y`}
-                maxLength={500}
-              />
-            </Field>
-          </div>
-        </div>
-        <ModalActions onClose={onClose} onSave={onSave} busy={busy} saveLabel="Create formula" />
       </div>
     ) : null}
   </Modal>
