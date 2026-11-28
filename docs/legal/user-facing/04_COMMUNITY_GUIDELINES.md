@@ -1,9 +1,9 @@
-# WIEZ Master Community Guidelines and Marketplace Integrity Directive
+# ARU Community Guidelines and Marketplace Integrity Directive
 
-**Effective Date:** November 11, 2026
-**Document Version:** 2026.11.11-v1.7
+**Effective Date:** December 13, 2026
+**Document Version:** 2026.11.28-v1.8
 
-**Applies To:** All registered users (Shoppers and Brands), visitors, and third-party contributors across the WIEZ Web Platform (`wiez.com`), Mobile Applications (iOS / Android), Brand Studio Workspaces, and all associated communication channels.
+**Applies To:** All registered users (Shoppers and Brands), visitors, and third-party contributors across the ARU Web Platform (`{{LEGAL_WEB_DOMAIN}}`), Mobile Applications (iOS / Android), Brand Studio Workspaces, and all associated communication channels.
 
 ---
 
@@ -11,13 +11,13 @@
 
 ### 1.1. Why These Guidelines Exist
 
-WIEZ is a social commerce and bespoke fashion ecosystem built for African and global creative expression, commerce, discovery, and authentic community. We believe that a thriving marketplace requires safety, authenticity, fairness, and mutual respect as non-negotiable foundations — not optional ideals.
+ARU is a social commerce and bespoke fashion ecosystem built for African and global creative expression, commerce, discovery, and authentic community. We believe that a thriving marketplace requires safety, authenticity, fairness, and mutual respect as non-negotiable foundations — not optional ideals.
 
-These Community Guidelines and Marketplace Integrity Directive (the "**Guidelines**") establish the behavioral, content, commercial, and safety standards that all participants on WIEZ — whether individual Shoppers, fashion Brands, independent designers, creative collaborators, or Runway visitors — must observe at all times.
+These Community Guidelines and Marketplace Integrity Directive (the "**Guidelines**") establish the behavioral, content, commercial, and safety standards that all participants on ARU — whether individual Shoppers, fashion Brands, independent designers, creative collaborators, or Runway visitors — must observe at all times.
 
 ### 1.2. Scope of Application
 
-These Guidelines apply to all interactions on WIEZ, including:
+These Guidelines apply to all interactions on ARU, including:
 * **Runway Feed**: Fashion lookbooks, design showcases, video reels, styling posts, comments, and story-format content.
 * **The Market**: Product listings, catalog descriptions, product imagery, pricing, and inventory claims.
 * **Custom Tailoring Engine**: Bespoke commissioning discussions, measurement exchanges, production milestone communications, and alteration negotiations.
@@ -36,22 +36,22 @@ These Guidelines operate as a unified framework together with the Master Terms o
 
 ### 2.1. Minimum Age Requirements
 
-WIEZ is available to:
+ARU is available to:
 * **Shoppers aged 18 and above** for full unrestricted access, purchases, and custom tailoring commissions.
 * **Individuals aged 13–17** for browsing the Runway only, under direct parental or legal guardian supervision and authorization, with the parent/guardian accepting full responsibility under these Guidelines.
-* **Children under 13** are strictly prohibited from creating accounts or accessing WIEZ. Any account determined to belong to a child under 13 will be immediately terminated and all associated data pseudonymized.
+* **Children under 13** are strictly prohibited from creating accounts or accessing ARU. Any account determined to belong to a child under 13 will be immediately terminated and all associated data pseudonymized.
 
 ### 2.2. Authentic Identity
 
 You must:
 * Represent yourself, your brand, or your business honestly and accurately.
-* Not impersonate any real individual (living or deceased), brand, public figure, government authority, or WIEZ staff member.
+* Not impersonate any real individual (living or deceased), brand, public figure, government authority, or ARU staff member.
 * Not create accounts using disposable, temporary, virtual, or fraudulent credentials.
 * Not operate multiple accounts to circumvent account restrictions, multiplied promotional benefits, or enforcement actions.
 
 ### 2.3. Account Security Responsibilities
 
-You are solely responsible for maintaining the confidentiality of your account credentials. You must notify WIEZ immediately at `security@wiez.com` if you suspect unauthorized access to your account. WIEZ will not be liable for losses arising from compromised credentials where reasonable security precautions were available to the user.
+You are solely responsible for maintaining the confidentiality of your account credentials. You must notify ARU immediately at `security@{{LEGAL_EMAIL_DOMAIN}}` if you suspect unauthorized access to your account. ARU will not be liable for losses arising from compromised credentials where reasonable security precautions were available to the user.
 
 ---
 
@@ -59,15 +59,15 @@ You are solely responsible for maintaining the confidentiality of your account c
 
 ### 3.1. Fundamental Content Principles
 
-All content published on WIEZ — including designs, product photos, lookbooks, video reels, profile images, captions, comments, reviews, and messages — must be:
+All content published on ARU — including designs, product photos, lookbooks, video reels, profile images, captions, comments, reviews, and messages — must be:
 * **Authentic**: Genuinely representing the creator's own work, real products, or genuine experiences.
 * **Rights-Cleared**: Created by you or used with full permission from the rights holder.
 * **Accurate**: Not misleading, deceptive, or exaggerated in any material respect.
-* **Fashion-Relevant**: Consistent with WIEZ's focus on fashion, design, styling, and creative commerce.
+* **Fashion-Relevant**: Consistent with ARU's focus on fashion, design, styling, and creative commerce.
 
 ### 3.2. Absolutely Prohibited Content
 
-The following categories of content are prohibited across all WIEZ surfaces without exception:
+The following categories of content are prohibited across all ARU surfaces without exception:
 
 **A. Harmful and Dangerous Content:**
 * Content that promotes, glorifies, instructs, or facilitates self-harm, suicide, eating disorders, or deliberate bodily harm.
@@ -97,16 +97,16 @@ The following categories of content are prohibited across all WIEZ surfaces with
 **F. Intellectual Property Violations:**
 * Counterfeit fashion goods, replica luxury items, or unauthorized reproductions of protected brand identities or design patents.
 * Uploading fashion photography, design illustrations, or creative media that you do not own or have not licensed.
-* Using another brand's name, trademark, logo, or distinctive trade dress on your WIEZ profile or listings without authorization.
+* Using another brand's name, trademark, logo, or distinctive trade dress on your ARU profile or listings without authorization.
 
 **G. Spam and Technical Abuse:**
 * Unsolicited mass messaging, repetitive promotional comments, automated engagement farming, or follow/unfollow manipulation.
-* Uploading malware, viruses, Trojan horse scripts, or exploiting WIEZ APIs beyond their documented purpose.
-* Scraping, crawling, or extracting WIEZ data, listings, prices, user profiles, or design assets through automated tools.
+* Uploading malware, viruses, Trojan horse scripts, or exploiting ARU APIs beyond their documented purpose.
+* Scraping, crawling, or extracting ARU data, listings, prices, user profiles, or design assets through automated tools.
 
 ### 3.3. Fashion-Specific Content Standards
 
-Given WIEZ's mission in the fashion industry:
+Given ARU's mission in the fashion industry:
 * **Product Photography**: Must depict the actual physical item for sale. Computer-generated renders or mockups are permitted in supplementary positions only and must be clearly labeled as CGI/mockup.
 * **Model Images**: All model imagery must be obtained with valid model consent and release agreements. You must not use images of real individuals without their permission.
 * **Fabric and Material Claims**: Fabric composition claims (e.g., "100% Nigerian Ankara cotton") must be verifiably accurate. False textile claims are a violation of these Guidelines and applicable consumer protection laws.
@@ -117,7 +117,7 @@ Given WIEZ's mission in the fashion industry:
 Where any content — including product imagery, design illustrations, or fashion photography — is primarily or substantially generated using artificial intelligence tools:
 * You must clearly disclose that the content is AI-generated.
 * AI-generated product photography must not misrepresent the actual physical product available for purchase.
-* WIEZ reserves the right to require disclosure labels on AI-generated content and to remove undisclosed AI imagery from product listings.
+* ARU reserves the right to require disclosure labels on AI-generated content and to remove undisclosed AI imagery from product listings.
 
 ---
 
@@ -127,7 +127,7 @@ Where any content — including product imagery, design illustrations, or fashio
 
 The following marketplace behaviors constitute serious violations and may result in immediate account termination:
 
-* **Off-Platform Circumvention**: Soliciting or accepting payments, tailoring commissions, or delivery arrangements outside WIEZ's checkout, escrow, and messaging infrastructure. This deprives buyers of payment protection, deprives WIEZ of platform fees, and eliminates escrow safety for both parties.
+* **Off-Platform Circumvention**: Soliciting or accepting payments, tailoring commissions, or delivery arrangements outside ARU's checkout, escrow, and messaging infrastructure. This deprives buyers of payment protection, deprives ARU of platform fees, and eliminates escrow safety for both parties.
 * **Price Gouging and Manipulation**: Artificially inflating prices during high-demand periods, flash sales abuse, or creating fraudulent scarcity signals.
 * **Shill Activity and Fake Engagement**: Purchasing, generating, or organizing fake follows, saves, likes, comments, Runway impressions, or review ratings for your own brand or a competitor's detriment.
 * **Chargeback Fraud**: Deliberately initiating illegitimate payment disputes or chargebacks after receiving goods or services.
@@ -144,11 +144,11 @@ Brands accepting bespoke tailoring commissions must:
 
 ### 4.3. Prohibited Products
 
-The following categories of products may not be listed or sold on WIEZ under any circumstances:
+The following categories of products may not be listed or sold on ARU under any circumstances:
 * Counterfeit goods or unlicensed replicas of protected brand identities.
 * Products subject to national or international trade sanctions or import bans.
 * Products making fraudulent health, medical, or therapeutic claims.
-* Second-hand goods or pre-owned fashion items (unless WIEZ launches a verified pre-owned category with separate applicable guidelines).
+* Second-hand goods or pre-owned fashion items (unless ARU launches a verified pre-owned category with separate applicable guidelines).
 * Goods manufactured using forced, child, or trafficked labor.
 
 ---
@@ -157,7 +157,7 @@ The following categories of products may not be listed or sold on WIEZ under any
 
 ### 5.1. What Constitutes Harassment
 
-WIEZ defines harassment as:
+ARU defines harassment as:
 * Repeated, unwanted contact directed at any specific user or brand designed to intimidate, embarrass, or distress.
 * Coordinated pile-on attacks where multiple users are directed to target one individual simultaneously.
 * Sending graphic violent or sexual content to a user without their consent.
@@ -166,7 +166,7 @@ WIEZ defines harassment as:
 
 ### 5.2. Impersonation
 
-You may not create accounts or profiles that deceive others into believing they are interacting with a different real person, brand, public figure, or WIEZ employee. Parody and satire accounts are permitted only if they are clearly labeled as parody, do not cause genuine confusion, and do not use the impersonated party's official profile imagery.
+You may not create accounts or profiles that deceive others into believing they are interacting with a different real person, brand, public figure, or ARU employee. Parody and satire accounts are permitted only if they are clearly labeled as parody, do not cause genuine confusion, and do not use the impersonated party's official profile imagery.
 
 ### 5.3. Doxxing
 
@@ -178,17 +178,17 @@ Publishing, sharing, or linking to another user's private or personal informatio
 
 ### 6.1. Zero Tolerance on Child Safety
 
-WIEZ operates a zero-tolerance policy for any content, behavior, or interaction that:
+ARU operates a zero-tolerance policy for any content, behavior, or interaction that:
 * Sexualizes or exploits minors in any form (CSAM).
 * Attempts to groom, solicit, or establish inappropriate contact with users under 18.
-* Uses WIEZ to recruit, traffic, or exploit any individual, particularly minors.
+* Uses ARU to recruit, traffic, or exploit any individual, particularly minors.
 
 Any violation will be immediately escalated to NAPTIP (Nigeria), NCMEC (USA), and law enforcement in all relevant jurisdictions.
 
 ### 6.2. Vulnerable User Protections
 
-WIEZ takes particular care to protect users who may be in vulnerable circumstances:
-* Content that promotes, glorifies, or provides methods for self-harm or suicide is prohibited. Where a user expresses distress or self-harm ideation, WIEZ may refer them to relevant mental health or crisis resources.
+ARU takes particular care to protect users who may be in vulnerable circumstances:
+* Content that promotes, glorifies, or provides methods for self-harm or suicide is prohibited. Where a user expresses distress or self-harm ideation, ARU may refer them to relevant mental health or crisis resources.
 * We may restrict certain content types to authenticated adult users where age-appropriate access controls are technically available.
 
 ---
@@ -201,7 +201,7 @@ Only Shoppers who have completed a verified purchase of a product or received a 
 
 ### 7.2. Standards for All Reviews
 
-Valid reviews on WIEZ must:
+Valid reviews on ARU must:
 * Reflect honest, first-hand experience of the specific product, brand, or bespoke garment being reviewed.
 * Focus on observable, relevant characteristics — quality, fit, craftsmanship, communication, accuracy of description, and delivery.
 * Not contain personal attacks on individual brand staff or private employees.
@@ -218,15 +218,15 @@ Valid reviews on WIEZ must:
 
 ### 7.4. Moderation Rights
 
-WIEZ reserves the right to assess, approve, delay, hide, remove, or reinstate reviews based on authenticity, policy compliance, legal obligations, or verified fraud signals. Moderation decisions may be appealed via `support@wiez.com`.
+ARU reserves the right to assess, approve, delay, hide, remove, or reinstate reviews based on authenticity, policy compliance, legal obligations, or verified fraud signals. Moderation decisions may be appealed via `support@{{LEGAL_EMAIL_DOMAIN}}`.
 
 ---
 
 ## 8. Private Messaging Standards
 
-### 8.1. Permitted Uses of WIEZ Messaging
+### 8.1. Permitted Uses of ARU Messaging
 
-WIEZ messaging infrastructure (direct messages, order threads, custom tailoring communications, and brand support channels) is designed exclusively for legitimate platform activity, including:
+ARU messaging infrastructure (direct messages, order threads, custom tailoring communications, and brand support channels) is designed exclusively for legitimate platform activity, including:
 * Order coordination, shipping queries, and post-purchase support.
 * Bespoke custom tailoring consultations, measurement clarifications, and production updates.
 * Fit dispute evidence submission and alteration coordination.
@@ -234,9 +234,9 @@ WIEZ messaging infrastructure (direct messages, order threads, custom tailoring 
 
 ### 8.2. Prohibited Messaging Conduct
 
-You may not use WIEZ messaging to:
+You may not use ARU messaging to:
 * Harass, threaten, bully, or repeatedly contact users who have not consented to communication.
-* Solicit payments, transactions, or tailoring commissions outside WIEZ's payment infrastructure.
+* Solicit payments, transactions, or tailoring commissions outside ARU's payment infrastructure.
 * Collect, harvest, or extract personal data from other users.
 * Send unsolicited bulk promotional messages or marketing spam.
 * Circulate malware, phishing links, or fraudulent investment solicitations.
@@ -244,15 +244,15 @@ You may not use WIEZ messaging to:
 
 ### 8.3. Administrator Access Disclosure
 
-WIEZ authorized support, trust and safety, and dispute resolution teams may access message content where required to: (a) investigate credible safety concerns, (b) resolve active order disputes or chargebacks, (c) respond to verified legal process, or (d) enforce these Guidelines. Message access is governed by our Privacy Policy and performed only on a need-to-know basis with appropriate internal authorization protocols.
+ARU authorized support, trust and safety, and dispute resolution teams may access message content where required to: (a) investigate credible safety concerns, (b) resolve active order disputes or chargebacks, (c) respond to verified legal process, or (d) enforce these Guidelines. Message access is governed by our Privacy Policy and performed only on a need-to-know basis with appropriate internal authorization protocols.
 
 ---
 
-## 9. WIEZ Enforcement Framework and Strike System
+## 9. ARU Enforcement Framework and Strike System
 
 ### 9.1. Enforcement Actions Available
 
-WIEZ may take any of the following enforcement actions, proportional to the severity and recurrence of a violation:
+ARU may take any of the following enforcement actions, proportional to the severity and recurrence of a violation:
 
 | Enforcement Level | Action | Typical Application |
 |---|---|---|
@@ -264,7 +264,7 @@ WIEZ may take any of the following enforcement actions, proportional to the seve
 
 ### 9.2. Formal Strike System
 
-WIEZ operates a cumulative strike system for content and conduct violations:
+ARU operates a cumulative strike system for content and conduct violations:
 
 * **Strike 1**: Written notice + content removal. Account placed on monitoring.
 * **Strike 2**: Feature restriction (loss of review or messaging privileges) for 14 days.
@@ -281,7 +281,7 @@ Strikes accumulate on a rolling 12-month calendar. A clean 12-month record resul
 * Confirmed account identity against any government sanctions list.
 * Coordinated chargeback fraud schemes.
 * Sustained counterfeit luxury goods operations following IP takedown.
-* Hacking, denial-of-service attacks, or exploitation of WIEZ platform vulnerabilities.
+* Hacking, denial-of-service attacks, or exploitation of ARU platform vulnerabilities.
 
 ### 9.4. How Enforcement Decisions Are Made
 
@@ -291,9 +291,9 @@ Enforcement actions are triggered by:
 * Payment provider fraud signals and chargeback risk scores.
 * Intellectual property takedown requests from verified rights holders.
 * Law enforcement requests with valid legal process.
-* Proactive WIEZ Trust & Safety team reviews.
+* Proactive ARU Trust & Safety team reviews.
 
-All enforcement actions are reviewed by at least one qualified WIEZ Trust & Safety team member before Level 4 or Level 5 actions are applied. Automated enforcement (Level 2) may be applied without human pre-approval where content matches a known prohibited pattern.
+All enforcement actions are reviewed by at least one qualified ARU Trust & Safety team member before Level 4 or Level 5 actions are applied. Automated enforcement (Level 2) may be applied without human pre-approval where content matches a known prohibited pattern.
 
 ---
 
@@ -301,7 +301,7 @@ All enforcement actions are reviewed by at least one qualified WIEZ Trust & Safe
 
 ### 10.1. Right to Appeal
 
-Any user or brand that believes an enforcement action was applied in error may submit a formal appeal within **30 days** of the enforcement action notice. Appeals must be submitted to `appeals@wiez.com` with:
+Any user or brand that believes an enforcement action was applied in error may submit a formal appeal within **30 days** of the enforcement action notice. Appeals must be submitted to `appeals@{{LEGAL_EMAIL_DOMAIN}}` with:
 * Your registered account email or username.
 * The specific content, action, or suspension being appealed.
 * A clear statement of why you believe the enforcement decision was incorrect.
@@ -328,15 +328,15 @@ Appeals will not be accepted for:
 
 Any user may report content, accounts, products, reviews, messages, or behavior that appears to violate these Guidelines using the in-platform report function available on every post, listing, profile, review, and message thread.
 
-For urgent safety threats, immediate harm, or criminal conduct, please contact us directly at `safety@wiez.com`. Reports involving credible physical threats or child safety will be escalated within one (1) business hour of receipt.
+For urgent safety threats, immediate harm, or criminal conduct, please contact us directly at `safety@{{LEGAL_EMAIL_DOMAIN}}`. Reports involving credible physical threats or child safety will be escalated within one (1) business hour of receipt.
 
 ### 11.2. Good Faith Reporting
 
-Reports must be submitted in good faith based on a genuine belief that a policy violation has occurred. Submitting false, bad-faith, or retaliatory reports against other users or brands to harm their standing on WIEZ is itself a violation of these Guidelines and subject to enforcement.
+Reports must be submitted in good faith based on a genuine belief that a policy violation has occurred. Submitting false, bad-faith, or retaliatory reports against other users or brands to harm their standing on ARU is itself a violation of these Guidelines and subject to enforcement.
 
 ### 11.3. Confidentiality of Reports
 
-WIEZ will not disclose the identity of users who submit safety reports to the reported party. In cases where legal process requires disclosure of reporter identity, WIEZ will notify the reporter to the extent permitted by law.
+ARU will not disclose the identity of users who submit safety reports to the reported party. In cases where legal process requires disclosure of reporter identity, ARU will notify the reporter to the extent permitted by law.
 
 ---
 
@@ -344,21 +344,21 @@ WIEZ will not disclose the identity of users who submit safety reports to the re
 
 ### 12.1. Your Ownership Obligations
 
-By uploading content to WIEZ, you confirm that you own or possess valid rights, licenses, and permissions for every element of that content — including photographs, video footage, music, graphic designs, pattern copyrights, brand names, and trademarked logos.
+By uploading content to ARU, you confirm that you own or possess valid rights, licenses, and permissions for every element of that content — including photographs, video footage, music, graphic designs, pattern copyrights, brand names, and trademarked logos.
 
 ### 12.2. Fashion Counterfeiting
 
-WIEZ has zero tolerance for counterfeit fashion goods. Brands found listing counterfeit versions of protected luxury or fashion brand identities will have their listings immediately removed and may face account termination under our Three-Strike IP System (detailed in the Content, IP, and Copyright Policy).
+ARU has zero tolerance for counterfeit fashion goods. Brands found listing counterfeit versions of protected luxury or fashion brand identities will have their listings immediately removed and may face account termination under our Three-Strike IP System (detailed in the Content, IP, and Copyright Policy).
 
 ### 12.3. Reporting Intellectual Property Violations
 
-Rights holders who believe their intellectual property has been infringed on WIEZ may submit a formal takedown notice to `copyright@wiez.com`. The complete procedure, required notice contents, and counter-notification process are governed by the Content, IP, and Copyright Policy.
+Rights holders who believe their intellectual property has been infringed on ARU may submit a formal takedown notice to `copyright@{{LEGAL_EMAIL_DOMAIN}}`. The complete procedure, required notice contents, and counter-notification process are governed by the Content, IP, and Copyright Policy.
 
 ---
 
-## 13. Transparency Regarding WIEZ Enforcement Activity
+## 13. Transparency Regarding ARU Enforcement Activity
 
-WIEZ will periodically publish aggregated, anonymized transparency data regarding:
+ARU will periodically publish aggregated, anonymized transparency data regarding:
 * Number of accounts warned, suspended, and permanently terminated per quarter.
 * Categories of most-reported content types.
 * Number of IP takedown notices received and actioned.
@@ -370,20 +370,20 @@ This commitment to transparency ensures our community understands how these Guid
 
 ## 14. Safety and Wellbeing Resources
 
-WIEZ is committed to the welfare of its community. If you or someone you know is in immediate danger or distress:
+ARU is committed to the welfare of its community. If you or someone you know is in immediate danger or distress:
 
 * **Nigeria Emergency Services**: 112 (General Emergency) / 08061997243 (Mental Health Support Line, Lagos)
 * **Suicide Prevention (Nigeria)**: Mentally Aware Nigeria Initiative (MANI) — `07031010494`
 * **NAPTIP (Human Trafficking Hotline)**: 0800-NAPTIP-0 (0800-627-847-0)
-* **WIEZ Safety Team**: `safety@wiez.com`
+* **ARU Safety Team**: `safety@{{LEGAL_EMAIL_DOMAIN}}`
 
 ---
 
 ## 15. Modifications to These Guidelines
 
-WIEZ reserves the right to update and refine these Guidelines as the platform grows and community norms evolve. For material changes:
+ARU reserves the right to update and refine these Guidelines as the platform grows and community norms evolve. For material changes:
 * We will provide at least **fifteen (15) days' advance notice** via an in-app banner or email.
-* Your continued use of WIEZ after the updated effective date constitutes acceptance of the revised Guidelines.
+* Your continued use of ARU after the updated effective date constitutes acceptance of the revised Guidelines.
 * The version number and effective date at the top of this document are updated with each revision.
 
 ---
@@ -392,14 +392,14 @@ WIEZ reserves the right to update and refine these Guidelines as the platform gr
 
 | Department | Contact |
 |---|---|
-| **General Support** | `support@wiez.com` |
-| **Trust & Safety (Violations)** | `safety@wiez.com` |
-| **Enforcement Appeals** | `appeals@wiez.com` |
-| **Intellectual Property Takedowns** | `copyright@wiez.com` |
-| **Security & Technical Vulnerabilities** | `security@wiez.com` |
-| **Legal & Regulatory Affairs** | `legal@wiez.com` |
-| **Data Protection Officer** | `privacy@wiez.com` |
-| **Corporate Entity & Address** | WIEZ Platforms Limited, 12B Admiralty Way, Lekki Phase 1, Lagos, Nigeria |
+| **General Support** | `support@{{LEGAL_EMAIL_DOMAIN}}` |
+| **Trust & Safety (Violations)** | `safety@{{LEGAL_EMAIL_DOMAIN}}` |
+| **Enforcement Appeals** | `appeals@{{LEGAL_EMAIL_DOMAIN}}` |
+| **Intellectual Property Takedowns** | `copyright@{{LEGAL_EMAIL_DOMAIN}}` |
+| **Security & Technical Vulnerabilities** | `security@{{LEGAL_EMAIL_DOMAIN}}` |
+| **Legal & Regulatory Affairs** | `legal@{{LEGAL_EMAIL_DOMAIN}}` |
+| **Data Protection Officer** | `privacy@{{LEGAL_EMAIL_DOMAIN}}` |
+| **Corporate Entity & Address** | Soteria Genesis Limited, No. 12, Adefarati, Church Street, Power Line, Lekki, Lagos, Nigeria |
 
 ---
 
@@ -415,6 +415,6 @@ Do not falsify payment, position, production readiness, retention deadlines or r
 
 ### Original-payment conversion for custom-order refunds
 
-When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. WIEZ records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
+When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. ARU records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
 
 An agreed post-Active partial dispute refund returns only the agreed amount. The order continues in its existing production/delivery lane. Each refund is recorded separately, repeat requests cannot duplicate it, and any later full remedy refunds only the remaining refundable balance. Future milestone earnings are reduced for the refunded share; no held milestone becomes payable because of a partial refund.

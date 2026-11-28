@@ -1,4 +1,5 @@
 import { LEGAL_PAGE_VERSION } from '@/pages/legal/legalVersion';
+import { getLegalVersions } from './LegalApi';
 import { apiClient } from './httpClient';
 import { unwrapApiResponse } from '@/types/auth';
 import { createIdempotencyKey } from './idempotency';
@@ -54,6 +55,23 @@ export interface SubscriptionHistoryItem
   purpose?: string;
   cancelRequestedAt?: string | null;
 }
+/**
+ * The Payment Policy version the server enforces. Sending it (as signup and
+ * mobile already do) keeps an open tab working across a policy update; the
+ * bundled version is only the fallback.
+ */
+async function paymentLegalVersion(): Promise<string> {
+  try {
+    const versions = await getLegalVersions();
+    return (
+      versions.documents.find((document) => document.key === 'PAYMENT_POLICY')
+        ?.version ?? LEGAL_PAGE_VERSION
+    );
+  } catch {
+    return LEGAL_PAGE_VERSION;
+  }
+}
+
 const path = (id: string) => `/brands/${id}/subscription`;
 async function post<T>(url: string, payload: unknown) {
   const key = createIdempotencyKey();
@@ -115,18 +133,18 @@ export const brandSubscriptionApi = {
       expectedAmountNgn: quote.amountNgn,
       savedCardId,
       recurringConsent: true,
-      legalVersion: LEGAL_PAGE_VERSION,
+      legalVersion: await paymentLegalVersion(),
     });
   },
   cards: async (id: string) =>
     unwrapApiResponse<import('./PaymentApi').SavedPaymentCardSummary[]>(
       (await apiClient.get(`${path(id)}/payment-methods`)).data,
     ),
-  changeCard: (id: string, savedCardId: string) =>
+  changeCard: async (id: string, savedCardId: string) =>
     post<{ success: boolean }>(`${path(id)}/payment-method`, {
       savedCardId,
       recurringConsent: true,
-      legalVersion: LEGAL_PAGE_VERSION,
+      legalVersion: await paymentLegalVersion(),
     }),
   claimNotice: (id: string) =>
     post<{

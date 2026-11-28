@@ -1,27 +1,27 @@
-# WIEZ Master Terms of Service
+# ARU Terms of Service
 
-**Effective Date:** November 11, 2026
+**Effective Date:** December 13, 2026
 
-**Document Version:** 2026.11.11-v1.7
+**Document Version:** 2026.11.28-v1.8
 
-**Applies To:** Web (`wiez.com`, `fthreadly`), Mobile Applications (iOS / Android / `threadly-mobile`), Brand Studio Workspaces, and all platform APIs.
+**Applies To:** Web (`{{LEGAL_WEB_DOMAIN}}`), Mobile Applications (iOS / Android), Brand Studio Workspaces, and all platform APIs.
 
 ---
 
 ## 1. Introduction and Agreement to Terms
 
 ### 1.1. Contractual Relationship
-These Terms of Service ("**Terms**") constitute a legally binding agreement between you ("**User**", "**Shopper**", "**Brand**", or "**You**") and **WIEZ Platforms Limited** (together with its subsidiaries, affiliates, successors, and assigns, "**WIEZ**", "**we**", "**us**", or "**our**").
+These Terms of Service ("**Terms**") constitute a legally binding agreement between you ("**User**", "**Shopper**", "**Brand**", or "**You**") and **Soteria Genesis Limited** (together with its subsidiaries, affiliates, successors, and assigns, "**ARU**", "**we**", "**us**", or "**our**").
 
 ### 1.2. Ecosystem Scope
-WIEZ operates a comprehensive social commerce and bespoke fashion platform that integrates:
+ARU operates a comprehensive social commerce and bespoke fashion platform that integrates:
 * **The Runway**: A visual media discovery stream for showcasing African and global fashion designs, creative lookbooks, videos, and community engagement.
 * **The Market**: A multi-vendor commercial marketplace for discovering and purchasing ready-to-wear fashion garments, accessories, and curated brand collections.
 * **The Custom Tailoring Engine**: A bespoke commissioning infrastructure utilizing 38-point ISO 8559 body measurement schemas, interactive silhouette visualizers, fabric selections, and direct tailor-to-buyer communication channels.
 * **The Brand Studio**: A merchant operating suite for fashion brands and designers to manage inventory, fulfill standard and bespoke orders, track finances, and access verified seller status.
 
 ### 1.3. Binding Acceptance
-By accessing, registering, downloading, browsing, or transacting on WIEZ, you confirm that you have read, understood, and unconditionally agree to be bound by these Terms, our Privacy Policy, Cookie Policy, Community Guidelines, Seller and Brand Terms, and Buyer Marketplace Policy. If you do not agree to these Terms, you must immediately cease all access and use of the Platform.
+By accessing, registering, downloading, browsing, or transacting on ARU, you confirm that you have read, understood, and unconditionally agree to be bound by these Terms, our Privacy Policy, Cookie Policy, Community Guidelines, Seller and Brand Terms, and Buyer Marketplace Policy. If you do not agree to these Terms, you must immediately cease all access and use of the Platform.
 
 ---
 
@@ -31,31 +31,31 @@ By accessing, registering, downloading, browsing, or transacting on WIEZ, you co
 You must be at least **18 years of age** (or the age of legal majority in your jurisdiction) to make purchases, open a Brand Studio account, or enter into custom tailoring contracts. Individuals aged **13 to 17** may browse the Runway and make purchases solely under the direct supervision and authorization of a parent or legal guardian who agrees to be bound by these Terms.
 
 ### 2.1.1. Age Verification Enforcement
-WIEZ uses multiple technical and process controls to enforce age requirements:
+ARU uses multiple technical and process controls to enforce age requirements:
 * **Registration Signal Analysis**: Our systems analyze IP geolocation, device profiles, and declared date-of-birth fields to flag suspected underage accounts.
 * **Payment-Gated Access**: Because card and mobile money payment processing requires account holder details verified by financial institutions, purchase capability is inherently restricted to eligible adults.
 * **Parental Consent Mechanism**: For users declaring age 13–17 during registration, a verified parental consent acknowledgment is required before browsing or purchase functionality is activated.
-* **User Reporting**: Community members and brands may flag suspected underage accounts to `safety@wiez.com`. Flagged accounts will be reviewed and restricted pending verification.
+* **User Reporting**: Community members and brands may flag suspected underage accounts to `safety@{{LEGAL_EMAIL_DOMAIN}}`. Flagged accounts will be reviewed and restricted pending verification.
 
-If WIEZ discovers that an account has been created by an individual under 13 without verifiable parental consent, the account will be immediately terminated and all associated data pseudonymized in accordance with our Privacy Policy.
+If ARU discovers that an account has been created by an individual under 13 without verifiable parental consent, the account will be immediately terminated and all associated data pseudonymized in accordance with our Privacy Policy.
 
 ### 2.2. Account Integrity & True Identity
 You must provide accurate, current, and verifiable information during registration, including a valid phone number (normalized to E.164 international format) and an authentic email address. You may not impersonate any person, brand, or entity, or create accounts using disposable, temporary, or fraudulent credentials.
 
 ### 2.3. Brand Studio Verification
-To publish products, receive custom orders, and disburse payouts, Brands must undergo WIEZ Identity and Business Verification, including:
+To publish products, receive custom orders, and disburse payouts, Brands must undergo ARU Identity and Business Verification, including:
 * Verification of legal corporate registration (Corporate Affairs Commission certificate or foreign company registry).
 * Tax Identification Number (TIN) validation.
 * Government-issued identification for the authorized account administrator.
-* Verification does not constitute an endorsement or warranty by WIEZ regarding the Brand’s financial stability, workmanship, or manufacturing capacity.
+* Verification does not constitute an endorsement or warranty by ARU regarding the Brand’s financial stability, workmanship, or manufacturing capacity.
 
 ### 2.4. Credential Confidentiality
-You are responsible for safeguarding your password, session tokens, and authentication devices. You must notify WIEZ immediately at `security@wiez.com` of any unauthorized access or security breach. WIEZ shall not be liable for losses caused by compromised credentials.
+You are responsible for safeguarding your password, session tokens, and authentication devices. You must notify ARU immediately at `security@{{LEGAL_EMAIL_DOMAIN}}` of any unauthorized access or security breach. ARU shall not be liable for losses caused by compromised credentials.
 
 ### 2.5. Username, Handle, and Store Name Allocation
 * **No Username Squatting**: You may not register handles, brand names, or store URLs with the intent of squatting, reserving, holding for ransom, or reselling the handle to third parties.
-* **Trademark Reclamation**: Registered trademark owners who discover an unauthorized third party using their protected name as a WIEZ handle or store alias may file a claim at `copyright@wiez.com`. WIEZ reserves the right to reassign or reclaim handles that infringe registered trademarks or confuse consumers.
-* **Inactive Handles**: WIEZ reserves the right to reclaim usernames or store handles that remain inactive for more than six (6) consecutive months without login activity or active listings.
+* **Trademark Reclamation**: Registered trademark owners who discover an unauthorized third party using their protected name as a ARU handle or store alias may file a claim at `copyright@{{LEGAL_EMAIL_DOMAIN}}`. ARU reserves the right to reassign or reclaim handles that infringe registered trademarks or confuse consumers.
+* **Inactive Handles**: ARU reserves the right to reclaim usernames or store handles that remain inactive for more than six (6) consecutive months without login activity or active listings.
 
 
 ---
@@ -63,11 +63,11 @@ You are responsible for safeguarding your password, session tokens, and authenti
 ## 3. User Content and Intellectual Property Licenses
 
 ### 3.1. User Ownership
-You retain all copyright, design rights, and proprietary ownership in the photos, video lookbooks, design sketches, styling descriptions, reviews, comments, and tailoring measurements you upload or transmit via WIEZ ("**User Content**").
+You retain all copyright, design rights, and proprietary ownership in the photos, video lookbooks, design sketches, styling descriptions, reviews, comments, and tailoring measurements you upload or transmit via ARU ("**User Content**").
 
-### 3.2. License Grant to WIEZ
-By uploading or sharing User Content on public or interactive surfaces of WIEZ (including the Runway, Market listings, public brand profiles, and reviews), you grant WIEZ a worldwide, perpetual, irrevocable (until account or content deletion), non-exclusive, transferable, sublicensable, royalty-free license to:
-* Host, store, cache, transcode, resize, reproduce, adapt, publish, translate, display, perform, and distribute your User Content across WIEZ web, native mobile apps, email channels, and verified social media handles.
+### 3.2. License Grant to ARU
+By uploading or sharing User Content on public or interactive surfaces of ARU (including the Runway, Market listings, public brand profiles, and reviews), you grant ARU a worldwide, perpetual, irrevocable (until account or content deletion), non-exclusive, transferable, sublicensable, royalty-free license to:
+* Host, store, cache, transcode, resize, reproduce, adapt, publish, translate, display, perform, and distribute your User Content across ARU web, native mobile apps, email channels, and verified social media handles.
 * Index, categorize, analyze, and process your User Content to generate personalized feed recommendations, search results, taxonomy tags, and marketplace discovery rankings.
 * Utilize metadata, viewing signals, bookmarking trends, and visual features to optimize platform algorithms and detect fraudulent, counterfeit, or duplicate listings.
 
@@ -78,7 +78,7 @@ For all User Content uploaded, you represent and warrant that:
 * Your content does not contain defamatory, obscene, pornographic, hateful, or unlawful material.
 
 ### 3.4. Generative AI Training Safeguards
-* **No Foundational Model Harvesting**: WIEZ will **not** license, sell, or syndicate your original design sketches, bespoke tailoring patterns, or private customer measurements to third-party artificial intelligence providers for the purpose of training general foundation models without your explicit affirmative opt-in.
+* **No Foundational Model Harvesting**: ARU will **not** license, sell, or syndicate your original design sketches, bespoke tailoring patterns, or private customer measurements to third-party artificial intelligence providers for the purpose of training general foundation models without your explicit affirmative opt-in.
 * **Internal Platform Optimization**: Platform machine learning models may process visual features and catalog tags solely for internal categorization, duplicate detection, search ranking, and Runway feed recommendation.
 
 
@@ -89,35 +89,35 @@ For all User Content uploaded, you represent and warrant that:
 ### 4.1. Prohibited Conduct
 You agree not to engage in, attempt, or encourage any of the following activities:
 * **Counterfeit & Replica Sales**: Offering, listing, or manufacturing counterfeit fashion goods, replica luxury branding, or stolen proprietary patterns.
-* **Automated Scraping & Extraction**: Utilizing bots, crawlers, spiders, scrapers, or automated tools to extract listings, prices, user profiles, sizing models, or design media from WIEZ.
-* **Off-Platform Circumvention**: Soliciting shoppers or brands met on WIEZ to complete payments or tailoring contracts outside the Platform to evade platform fees, escrow protection, or verification.
+* **Automated Scraping & Extraction**: Utilizing bots, crawlers, spiders, scrapers, or automated tools to extract listings, prices, user profiles, sizing models, or design media from ARU.
+* **Off-Platform Circumvention**: Soliciting shoppers or brands met on ARU to complete payments or tailoring contracts outside the Platform to evade platform fees, escrow protection, or verification.
 * **Manipulation & Fraud**: Posting fake, incentivized, or coercive reviews; fabricating sales velocity; creating duplicate accounts to exploit promotional discounts; or executing chargeback fraud.
 * **Platform Disruption**: Uploading viruses, Trojan horses, malware, or exploiting rate limits or API endpoints.
 
 ### 4.1.1. Anti-Circumvention and Liquidated Damages
-Because off-platform transactions deprive users of escrow safety and deprive WIEZ of operating revenues necessary to maintain platform infrastructure, you agree that if you intentionally solicit or redirect an order off-platform:
-* WIEZ may immediately freeze pending merchant balances and suspend all studio capabilities.
-* You agree to pay WIEZ liquidated damages equal to the greater of **One Hundred Thousand Nigerian Naira (₦100,000)** or **thirty percent (30%) of the total gross value** of the circumvented transactions, which represents a reasonable pre-estimate of WIEZ's investigative and administrative damages.
+Because off-platform transactions deprive users of escrow safety and deprive ARU of operating revenues necessary to maintain platform infrastructure, you agree that if you intentionally solicit or redirect an order off-platform:
+* ARU may immediately freeze pending merchant balances and suspend all studio capabilities.
+* You agree to pay ARU liquidated damages equal to the greater of **One Hundred Thousand Nigerian Naira (₦100,000)** or **thirty percent (30%) of the total gross value** of the circumvented transactions, which represents a reasonable pre-estimate of ARU's investigative and administrative damages.
 
 
 ### 4.2. Enforcement and Sanctions
-WIEZ reserves the right, with or without prior notice, to investigate violations and:
+ARU reserves the right, with or without prior notice, to investigate violations and:
 * Remove, edit, or restrict the visibility of non-compliant listings, comments, or designs.
 * Issue formal compliance strikes against Brand or Shopper accounts.
 * Suspend or permanently terminate accounts, freeze active balances associated with fraudulent transactions, and report criminal conduct to appropriate law enforcement authorities.
 
 ### 4.3. Enforcement Appeals
-Users or Brands who believe an enforcement action was applied incorrectly may submit a formal written appeal to `appeals@wiez.com` within **thirty (30) days** of receiving the enforcement notice. Appeals must state the specific action being contested and provide supporting evidence. WIEZ will review and respond within the following timelines:
+Users or Brands who believe an enforcement action was applied incorrectly may submit a formal written appeal to `appeals@{{LEGAL_EMAIL_DOMAIN}}` within **thirty (30) days** of receiving the enforcement notice. Appeals must state the specific action being contested and provide supporting evidence. ARU will review and respond within the following timelines:
 * **Account restrictions and content removal**: Seven (7) business days.
 * **Account suspensions (30 days or less)**: Fourteen (14) business days.
 * **Permanent account terminations**: Thirty (30) business days.
 
-Appeals will not be entertained for terminations involving CSAM, terrorism content, confirmed financial fraud, or active criminal referrals. WIEZ's appeals decision is final.
+Appeals will not be entertained for terminations involving CSAM, terrorism content, confirmed financial fraud, or active criminal referrals. ARU's appeals decision is final.
 
-### 4.4. WIEZ as Marketplace Intermediary — No Product Liability
-WIEZ operates as a **technology marketplace intermediary and platform operator**. WIEZ is not the manufacturer, seller of record, designer, or distributor of any physical garment, textile product, or fashion accessory listed or sold by independent Brands on the Market or through the Custom Tailoring Engine. WIEZ does not take title to goods at any point in any transaction.
+### 4.4. ARU as Marketplace Intermediary — No Product Liability
+ARU operates as a **technology marketplace intermediary and platform operator**. ARU is not the manufacturer, seller of record, designer, or distributor of any physical garment, textile product, or fashion accessory listed or sold by independent Brands on the Market or through the Custom Tailoring Engine. ARU does not take title to goods at any point in any transaction.
 
-All product liability, defective goods claims, consumer statutory rights, and warranties for physical items rest solely with the Brand that manufactured and sold the item. WIEZ's liability is strictly limited to its role as a transactional intermediary and escrow administrator under Section 14.
+All product liability, defective goods claims, consumer statutory rights, and warranties for physical items rest solely with the Brand that manufactured and sold the item. ARU's liability is strictly limited to its role as a transactional intermediary and escrow administrator under Section 14.
 
 ---
 
@@ -130,11 +130,14 @@ Brands must maintain strictly accurate catalog entries, including:
 * High-resolution, authentic product imagery representing the actual garment manufactured (computer-generated mockups must be clearly labeled).
 
 ### 5.2. Pricing and Clerical Errors
-* Prices displayed on WIEZ are set independently by Brands.
-* In the event of a material clerical or typographical error where a product is inadvertently listed at an incorrect price, the Brand and WIEZ reserve the right to cancel the order and issue a full refund to the Shopper before shipment.
+* Prices displayed on ARU are set independently by Brands.
+* In the event of a material clerical or typographical error where a product is inadvertently listed at an incorrect price, the Brand and ARU reserve the right to cancel the order and issue a full refund to the Shopper before shipment.
 
 ### 5.3. Multi-Vendor Bagging
 Shoppers may bag items from multiple independent Brands in a single transaction. The Platform splits the payment intent into discrete sub-orders. Each Brand remains individually responsible for fulfilling its portion of the multi-vendor order.
+
+### 5.4. How the Market Orders Items
+ARU orders Market items using published rules: item quality and completeness, freshness, popularity across all shoppers, admin-curated sections (labelled), and, if personalisation is on, your own activity on ARU as described in the Privacy Policy §3.4. Brands cannot pay to change their position unless a placement is clearly labelled as sponsored. You can turn personalisation off at any time and still use every Market feature. Section names describe what they contain; "Popular in your state" appears only where at least 20 shoppers in that state have taken part.
 
 ---
 
@@ -146,10 +149,10 @@ Shoppers may bag items from multiple independent Brands in a single transaction.
 
 ### 6.2. Shipping Timelines & Late Fulfillment
 * Brands must dispatch ready-to-wear items within their declared processing window (standard default: 3–5 business days).
-* If a Brand fails to upload valid tracking information within seven (7) business days of order confirmation, WIEZ reserves the right to cancel the order, issue an immediate full refund to the Shopper, and assess a late-fulfillment penalty against the Brand's performance rating.
+* If a Brand fails to upload valid tracking information within seven (7) business days of order confirmation, ARU reserves the right to cancel the order, issue an immediate full refund to the Shopper, and assess a late-fulfillment penalty against the Brand's performance rating.
 
 ### 6.3. Product Recalls and Safety Defects
-If a product sold on WIEZ is subject to a safety recall or regulatory ban, the Brand must notify WIEZ immediately at `safety@wiez.com` and provide full refunds to all affected Shoppers at the Brand's sole expense.
+If a product sold on ARU is subject to a safety recall or regulatory ban, the Brand must notify ARU immediately at `safety@{{LEGAL_EMAIL_DOMAIN}}` and provide full refunds to all affected Shoppers at the Brand's sole expense.
 
 ---
 
@@ -159,8 +162,8 @@ If a product sold on WIEZ is subject to a safety recall or regulatory ban, the B
 Custom orders represent unique, individualized garments tailored to specific body measurements and fabric choices. They do not constitute standard mass-manufactured retail inventory.
 
 ### 7.2. Measurement Responsibility
-* Shoppers may submit measurements manually or utilize WIEZ's interactive 38-point ISO 8559 measurement guide and body silhouette tools.
-* **The Shopper is strictly responsible for the accuracy of all submitted measurements.** WIEZ and the Brand are not liable for ill-fitting garments resulting from inaccurate measurements provided by the Shopper.
+* Shoppers may submit measurements manually or utilize ARU's interactive 38-point ISO 8559 measurement guide and body silhouette tools.
+* **The Shopper is strictly responsible for the accuracy of all submitted measurements.** ARU and the Brand are not liable for ill-fitting garments resulting from inaccurate measurements provided by the Shopper.
 
 ### 7.3. Artisanal Fit Tolerance Margin
 * Handcrafted and bespoke tailoring involves natural manual cutting and textile flex.
@@ -175,12 +178,12 @@ Where a custom order includes brand-sourced textiles, minor artisanal dye-lot va
 
 ### 7.6. Production Deadlines and Time Extensions
 * Each new subscription-queue custom order records its production terms at checkout; production, dispatch and delivery dates run from activation. Historical orders retain their recorded dates. Queue waiting is not production delay.
-* **A Brand cannot extend its own deadline.** Where a Brand requires additional time it must request it from the Shopper, who may accept or decline. Neither WIEZ nor the Brand may grant the extension in the Shopper's place.
+* **A Brand cannot extend its own deadline.** Where a Brand requires additional time it must request it from the Shopper, who may accept or decline. Neither ARU nor the Brand may grant the extension in the Shopper's place.
 * **Platform limits**: a maximum of **three (3) calendar days per request**, **two (2) approved extensions per order**, and **six (6) calendar days in total per order**. Declined and expired requests do not consume these limits.
-* **Rush orders cannot be extended at all.** Where a Shopper has paid a rush production fee, WIEZ refuses extension requests on that order. The fee is consideration for a date.
-* **The Shopper has twenty-four (24) hours to respond**, or until the original deadline, whichever falls first. **A failure to respond is not consent**: the request expires, no time is granted, and the order is escalated for WIEZ administrative review.
+* **Rush orders cannot be extended at all.** Where a Shopper has paid a rush production fee, ARU refuses extension requests on that order. The fee is consideration for a date.
+* **The Shopper has twenty-four (24) hours to respond**, or until the original deadline, whichever falls first. **A failure to respond is not consent**: the request expires, no time is granted, and the order is escalated for ARU administrative review.
 * **Accepting** moves the production, dispatch and delivery dates by the days granted, and moves the Bespoke Inspection Window (Section 7.4) and the corresponding escrow release schedule with them. The originally promised dates are retained on the order record and remain the reference point for assessing Brand performance.
-* **Declining is not a cancellation and not a refund request.** The order and the Shopper's payment are unaffected. A dispute is opened and WIEZ places the order under administrative intervention, during which WIEZ may communicate separately and privately with each party. Communications sent by WIEZ in that capacity are informational and are not a channel for replies; both parties retain their existing in-order messaging and dispute routes.
+* **Declining is not a cancellation and not a refund request.** The order and the Shopper's payment are unaffected. A dispute is opened and ARU places the order under administrative intervention, during which ARU may communicate separately and privately with each party. Communications sent by ARU in that capacity are informational and are not a channel for replies; both parties retain their existing in-order messaging and dispute routes.
 * Every request, response, attached comment, number of days granted and resulting date change is recorded on the order and retained under the Privacy Policy.
 
 ---
@@ -188,7 +191,7 @@ Where a custom order includes brand-sourced textiles, minor artisanal dye-lot va
 ## 8. Payments, Escrow Settlements, and Financial Ledger Architecture
 
 ### 8.1. Payment Collection
-WIEZ integrates with PCI-DSS compliant third-party payment processors (including Paystack and the authorized card networks it settles through). By submitting an order, you authorize WIEZ to charge your designated card, bank account, or digital wallet for the full transaction sum.
+ARU integrates with PCI-DSS compliant third-party payment processors (including Paystack and the authorized card networks it settles through). By submitting an order, you authorize ARU to charge your designated card, bank account, or digital wallet for the full transaction sum.
 
 ### 8.2. Settlement Escrow Ledger
 To safeguard marketplace integrity:
@@ -197,11 +200,11 @@ To safeguard marketplace integrity:
 * **Payout Release Trigger**: Standard-order settlement and the final custom-order allocation follow delivery/inspection and dispute controls. Custom production allocation follows the 60%/40% terms below and cannot release before Active; Pending/Up Next are fully held.
 
 ### 8.3. Platform Commissions and Transaction Fees
-* WIEZ deducts an agreed platform commission (as declared in the Brand Studio agreement, default: 8%–12%) plus standard payment gateway interchange fees from each completed order.
+* ARU deducts an agreed platform commission (as declared in the Brand Studio agreement, default: 8%–12%) plus standard payment gateway interchange fees from each completed order.
 * Commission rates may be updated with thirty (30) days' written notice to Brands via the Studio Dashboard.
 
 ### 8.4. Rolling Reserves & Payout Holds
-WIEZ reserves the right to impose a temporary rolling reserve (holding 5%–15% of payouts for 30–60 days) or suspend disbursements if a Brand experiences:
+ARU reserves the right to impose a temporary rolling reserve (holding 5%–15% of payouts for 30–60 days) or suspend disbursements if a Brand experiences:
 * Abnormally high return or dispute rates (>3% of total orders).
 * Unresolved intellectual property or counterfeit complaints.
 * Rapid sales velocity spikes unbacked by fulfillment history.
@@ -227,7 +230,7 @@ The pre-Active cancellation rights and itemized deductions in the subscription q
 
 ### 9.3. EU Consumer Statutory Right of Withdrawal & Custom Goods Exemption
 * **Standard Digital & Ready-to-Wear Services**: For consumers resident in the European Union or United Kingdom, you generally possess a statutory right to withdraw from a distance purchase within fourteen (14) days without giving any reason.
-* **Statutory Bespoke Exemption**: Pursuant to **Article 16(c) of Directive 2011/83/EU on Consumer Rights** (and equivalent UK consumer contracts regulations), the statutory 14-day right of withdrawal **does NOT apply to goods made to the consumer’s specifications or clearly personalized**. All custom bespoke orders manufactured through the WIEZ Custom Tailoring Engine fall squarely within this statutory exemption once fabric cutting has commenced.
+* **Statutory Bespoke Exemption**: Pursuant to **Article 16(c) of Directive 2011/83/EU on Consumer Rights** (and equivalent UK consumer contracts regulations), the statutory 14-day right of withdrawal **does NOT apply to goods made to the consumer’s specifications or clearly personalized**. All custom bespoke orders manufactured through the ARU Custom Tailoring Engine fall squarely within this statutory exemption once fabric cutting has commenced.
 
 
 ---
@@ -244,27 +247,27 @@ Users and Brands agree not to:
 * Extort Brands by threatening negative reviews to obtain free merchandise or unauthorized refunds.
 
 ### 10.3. Moderation Rights
-WIEZ reserves the right to remove any review that violates Community Guidelines, contains offensive language, discloses private personal data, or is proven to be fraudulent.
+ARU reserves the right to remove any review that violates Community Guidelines, contains offensive language, discloses private personal data, or is proven to be fraudulent.
 
 ---
 
 ## 11. Intellectual Property Protection and Takedown Protocol
 
-### 11.1. WIEZ Proprietary Rights
-All software, graphics, user interfaces, visual design representations, sizing visualizers, icons, algorithms, databases, and trademarks on WIEZ are owned by or licensed to WIEZ Platforms Limited. You may not copy, decompile, reverse engineer, or create derivative works from the Platform.
+### 11.1. ARU Proprietary Rights
+All software, graphics, user interfaces, visual design representations, sizing visualizers, icons, algorithms, databases, and trademarks on ARU are owned by or licensed to Soteria Genesis Limited. You may not copy, decompile, reverse engineer, or create derivative works from the Platform.
 
 ### 11.2. Notice and Takedown (DMCA & Nigerian Copyright Law)
-Rights holders who believe their creative design, photography, or trademark is infringed on WIEZ may submit a formal Notice of Infringement to `copyright@wiez.com` containing:
+Rights holders who believe their creative design, photography, or trademark is infringed on ARU may submit a formal Notice of Infringement to `copyright@{{LEGAL_EMAIL_DOMAIN}}` containing:
 1. Physical or electronic signature of the authorized copyright owner.
 2. Specific identification of the copyrighted work claimed to have been infringed.
-3. The exact URL, Brand name, or Product ID of the infringing listing on WIEZ.
+3. The exact URL, Brand name, or Product ID of the infringing listing on ARU.
 4. Contact information of the claimant (name, address, telephone, email).
 5. A statement that the claimant has a good-faith belief that the disputed use is unauthorized.
 6. A statement made under penalty of perjury that the notification is accurate.
 
 ### 11.3. Counter-Notification & Repeat Infringer Policy
 * A Brand whose listing is removed may submit a Counter-Notification showing ownership or valid license.
-* Accounts receiving three (3) verified, un-rebutted infringement strikes within a twelve-month period will be permanently banned from WIEZ.
+* Accounts receiving three (3) verified, un-rebutted infringement strikes within a twelve-month period will be permanently banned from ARU.
 
 ---
 
@@ -275,10 +278,10 @@ You may delete your account at any time via Settings (`/settings/delete-account`
 * Your public profile, Runway posts, lookbooks, and comments are immediately removed from public view.
 * Active open orders, bespoke commitments, or pending payment settlements must be fully fulfilled or resolved prior to final account erasure.
 
-### 12.2. Termination by WIEZ
-WIEZ may suspend, restrict, or terminate your account immediately if:
+### 12.2. Termination by ARU
+ARU may suspend, restrict, or terminate your account immediately if:
 * You materially or repeatedly breach these Terms, Community Guidelines, or Seller Terms.
-* Your conduct creates legal liability, regulatory exposure, or financial harm to WIEZ or other users.
+* Your conduct creates legal liability, regulatory exposure, or financial harm to ARU or other users.
 * Required KYC verification fails or your account is matched against international sanctions lists.
 
 ### 12.3. Survival
@@ -292,25 +295,25 @@ Sections 3 (Licenses), 6 (Risk of Loss), 8 (Settlements & Chargebacks), 11 (IP),
 The Platform, Runway, Market, and Custom Tailoring Engine are provided on an **"AS IS" and "AS AVAILABLE"** basis without warranties of any kind, either express, implied, or statutory.
 
 ### 13.2. No Guarantee of Third-Party Goods
-WIEZ disclaims all warranties regarding the quality, craftsmanship, durability, safety, or legality of items sold, tailored, or delivered by independent Brands. WIEZ does not guarantee that custom bespoke garments will satisfy subjective aesthetic expectations beyond objective adherence to submitted measurement profiles.
+ARU disclaims all warranties regarding the quality, craftsmanship, durability, safety, or legality of items sold, tailored, or delivered by independent Brands. ARU does not guarantee that custom bespoke garments will satisfy subjective aesthetic expectations beyond objective adherence to submitted measurement profiles.
 
 ### 13.3. Service Continuity
-WIEZ does not warrant that the Platform will be uninterrupted, error-free, secure, or free from viruses or software vulnerabilities.
+ARU does not warrant that the Platform will be uninterrupted, error-free, secure, or free from viruses or software vulnerabilities.
 
 ### 13.4. Textile Allergen, Chemical, and Dye Sensitivity Disclaimer
 * Independent Brands sell apparel manufactured from diverse natural, synthetic, and artisanal textiles (including traditional hand-dyed African wax prints, adire, silk, wool, and synthetic polymers) that may utilize reactive dyes, metallic hardware, or finishing treatments.
-* **Buyer Assumption of Risk**: WIEZ has no role in fabric sourcing or chemical finishing. Shoppers with known skin sensitivities, contact dermatitis, or allergies to specific textile dyes, nickel hardware, or fabrics assume sole responsibility for reviewing garment composition details and consulting the Brand prior to wearing. WIEZ expressly disclaims all liability for allergic reactions, skin irritations, or color bleeding.
+* **Buyer Assumption of Risk**: ARU has no role in fabric sourcing or chemical finishing. Shoppers with known skin sensitivities, contact dermatitis, or allergies to specific textile dyes, nickel hardware, or fabrics assume sole responsibility for reviewing garment composition details and consulting the Brand prior to wearing. ARU expressly disclaims all liability for allergic reactions, skin irritations, or color bleeding.
 
 ---
 
 ## 14. Limitations of Liability
 
 ### 14.1. Exclusion of Consequential Damages
-To the maximum extent permitted by applicable law, in no event shall WIEZ, its directors, officers, employees, agents, or affiliates be liable for any indirect, incidental, special, punitive, exemplary, or consequential damages (including loss of profits, loss of data, loss of goodwill, production delays, or commercial disruption) arising out of or in connection with these Terms or your use of the Platform.
+To the maximum extent permitted by applicable law, in no event shall ARU, its directors, officers, employees, agents, or affiliates be liable for any indirect, incidental, special, punitive, exemplary, or consequential damages (including loss of profits, loss of data, loss of goodwill, production delays, or commercial disruption) arising out of or in connection with these Terms or your use of the Platform.
 
 ### 14.2. Monetary Liability Cap
-In no event shall WIEZ’s total aggregate liability arising out of or related to these Terms, whether in contract, tort (including negligence), warranty, or otherwise, exceed the greater of:
-* The total transaction commissions retained by WIEZ from your purchases or sales in the three (3) months preceding the event giving rise to liability; or
+In no event shall ARU’s total aggregate liability arising out of or related to these Terms, whether in contract, tort (including negligence), warranty, or otherwise, exceed the greater of:
+* The total transaction commissions retained by ARU from your purchases or sales in the three (3) months preceding the event giving rise to liability; or
 * **One Hundred Thousand Nigerian Naira (NGN 100,000)** (or foreign currency equivalent).
 
 ---
@@ -318,21 +321,21 @@ In no event shall WIEZ’s total aggregate liability arising out of or related t
 ## 14A. Force Majeure and Events Beyond Reasonable Control
 
 ### 14A.1. Force Majeure Events
-WIEZ shall not be in breach of these Terms, nor liable for any delay or failure in performance of its obligations under these Terms, to the extent that such failure or delay is caused by, results from, or is attributable to events or circumstances beyond WIEZ's reasonable control ("**Force Majeure Events**"), including without limitation:
+ARU shall not be in breach of these Terms, nor liable for any delay or failure in performance of its obligations under these Terms, to the extent that such failure or delay is caused by, results from, or is attributable to events or circumstances beyond ARU's reasonable control ("**Force Majeure Events**"), including without limitation:
 * Acts of God, natural disasters, floods, fires, earthquakes, or extreme weather events.
 * Government-declared public health emergencies, epidemics, or pandemics.
 * War, civil war, armed conflict, riot, civil unrest, terrorism, or threat of terrorism.
 * National or international trade embargoes, sanctions, or regulatory interventions disrupting the Platform's commercial operations.
-* Widespread internet infrastructure failures, undersea cable breaks, or major cloud provider outages affecting WIEZ's hosting infrastructure (AWS, Cloudflare).
-* Labor disputes, strikes, or industrial actions by third parties outside WIEZ's control.
-* Acts or omissions of payment providers (Paystack) beyond WIEZ's control.
+* Widespread internet infrastructure failures, undersea cable breaks, or major cloud provider outages affecting ARU's hosting infrastructure (AWS, Cloudflare).
+* Labor disputes, strikes, or industrial actions by third parties outside ARU's control.
+* Acts or omissions of payment providers (Paystack) beyond ARU's control.
 
 ### 14A.2. Obligations During Force Majeure
 In the event of a Force Majeure Event:
-* WIEZ will use commercially reasonable efforts to provide advance notice to affected users where possible, via in-app banners, push notifications, or email.
-* WIEZ will use reasonable endeavors to mitigate the impact of the Force Majeure Event and resume normal operations as soon as practicable.
-* **Brand and Shopper Obligations**: Brands experiencing Force Majeure events affecting their production or fulfillment capacity must notify WIEZ at `support@wiez.com` within forty-eight (48) hours. WIEZ will work with affected parties to pause, extend, or facilitate resolution of open orders.
-* WIEZ's obligation to disburse escrow settlements may be temporarily suspended during a Force Majeure Event but shall resume promptly upon the cessation of the event.
+* ARU will use commercially reasonable efforts to provide advance notice to affected users where possible, via in-app banners, push notifications, or email.
+* ARU will use reasonable endeavors to mitigate the impact of the Force Majeure Event and resume normal operations as soon as practicable.
+* **Brand and Shopper Obligations**: Brands experiencing Force Majeure events affecting their production or fulfillment capacity must notify ARU at `support@{{LEGAL_EMAIL_DOMAIN}}` within forty-eight (48) hours. ARU will work with affected parties to pause, extend, or facilitate resolution of open orders.
+* ARU's obligation to disburse escrow settlements may be temporarily suspended during a Force Majeure Event but shall resume promptly upon the cessation of the event.
 
 ### 14A.3. Extended Force Majeure
 If a Force Majeure Event continues for more than sixty (60) days and materially prevents the fulfillment of an order, either party may cancel the affected order. Historical and standard orders retain their applicable force-majeure remedies. A new-policy Pending/Up Next cancellation uses its accepted pre-Active deduction policy; mandatory statutory refunds prevail.
@@ -341,7 +344,7 @@ If a Force Majeure Event continues for more than sixty (60) days and materially 
 
 ## 15. Indemnification
 
-You agree to defend, indemnify, and hold harmless WIEZ Platforms Limited, its parent company, subsidiaries, affiliates, officers, directors, employees, and agents from and against all claims, liabilities, damages, losses, expenses, and reasonable legal and accounting fees arising out of or in any way connected with:
+You agree to defend, indemnify, and hold harmless Soteria Genesis Limited, its parent company, subsidiaries, affiliates, officers, directors, employees, and agents from and against all claims, liabilities, damages, losses, expenses, and reasonable legal and accounting fees arising out of or in any way connected with:
 * Your access to, use of, or misuse of the Platform, Runway, Market, or Studio.
 * Your User Content, including design infringement, defamation, or privacy violation claims.
 * Your breach of these Terms, Seller Terms, or Community Guidelines.
@@ -352,7 +355,7 @@ You agree to defend, indemnify, and hold harmless WIEZ Platforms Limited, its pa
 ## 16. Dispute Resolution, Governing Law, and Arbitration
 
 ### 16.1. Informal Dispute Resolution
-In the event of any controversy, claim, or dispute arising out of or relating to these Terms, the parties agree to first attempt in good faith to resolve the dispute informally by submitting a detailed notice to `disputes@wiez.com`. Both parties agree to negotiate in good faith for at least **thirty (30) days** prior to commencing formal legal proceedings.
+In the event of any controversy, claim, or dispute arising out of or relating to these Terms, the parties agree to first attempt in good faith to resolve the dispute informally by submitting a detailed notice to `disputes@{{LEGAL_EMAIL_DOMAIN}}`. Both parties agree to negotiate in good faith for at least **thirty (30) days** prior to commencing formal legal proceedings.
 
 ### 16.2. Binding Commercial Arbitration
 If informal resolution fails within thirty (30) days, the dispute shall be finally settled by binding arbitration in accordance with the **Arbitration and Mediation Act of Nigeria** (or the rules of the **Lagos Court of Arbitration (LCA)**).
@@ -362,10 +365,10 @@ If informal resolution fails within thirty (30) days, the dispute shall be final
 * The arbitral award shall be final, non-appealable, and binding upon both parties, and judgment may be entered in any court of competent jurisdiction.
 
 ### 16.3. Class Action Waiver
-You agree that any arbitration or legal proceeding shall be conducted solely on an **individual basis** and not in a class, consolidated, collective, or representative proceeding. You expressly waive any right to file a class action or seek relief on a class-wide basis against WIEZ.
+You agree that any arbitration or legal proceeding shall be conducted solely on an **individual basis** and not in a class, consolidated, collective, or representative proceeding. You expressly waive any right to file a class action or seek relief on a class-wide basis against ARU.
 
 ### 16.4. Injunctive Relief Carve-Out
-Notwithstanding Section 16.2, WIEZ reserves the right to seek emergency injunctive or equitable relief in any court of competent jurisdiction to prevent the actual or threatened infringement, misappropriation, or violation of its intellectual property, trade secrets, or software security.
+Notwithstanding Section 16.2, ARU reserves the right to seek emergency injunctive or equitable relief in any court of competent jurisdiction to prevent the actual or threatened infringement, misappropriation, or violation of its intellectual property, trade secrets, or software security.
 
 ---
 
@@ -378,12 +381,12 @@ These Terms, and all claims or causes of action arising out of or related to the
 ## 18. Electronic Communications and Notices
 
 ### 18.1. Consent to Electronic Records
-By using WIEZ, you consent to receive all agreements, disclosures, invoices, notices, and communications electronically via in-app push notifications, the Brand Studio dashboard, or email to the address associated with your account. You agree that electronic notices satisfy any legal requirement that such communications be in writing.
+By using ARU, you consent to receive all agreements, disclosures, invoices, notices, and communications electronically via in-app push notifications, the Brand Studio dashboard, or email to the address associated with your account. You agree that electronic notices satisfy any legal requirement that such communications be in writing.
 
 ### 18.2. Legal Service Notices
-Official legal notices to WIEZ must be delivered by registered courier or certified mail to:
-* **Legal Department**: WIEZ Platforms Limited
-* **Email**: `legal@wiez.com`
+Official legal notices to ARU must be delivered by registered courier or certified mail to:
+* **Legal Department**: Soteria Genesis Limited
+* **Email**: `legal@{{LEGAL_EMAIL_DOMAIN}}`
 * **Subject Line**: `ATTN: LEGAL AFFAIRS - FORMAL NOTICE`
 
 ---
@@ -394,20 +397,20 @@ Official legal notices to WIEZ must be delivered by registered courier or certif
 You represent and warrant that you are not listed on any government denied-party or sanctions list (including the Nigerian EFCC/NFIU lists, US OFAC Specially Designated Nationals List, or UN Sanctions lists).
 
 ### 19.2. Anti-Money Laundering
-Brands and Shoppers agree not to use WIEZ for money laundering, terrorist financing, illicit capital flight, or fraudulent financial structuring. WIEZ reports suspicious transaction activities to competent regulatory authorities in compliance with applicable anti-money laundering legislation.
+Brands and Shoppers agree not to use ARU for money laundering, terrorist financing, illicit capital flight, or fraudulent financial structuring. ARU reports suspicious transaction activities to competent regulatory authorities in compliance with applicable anti-money laundering legislation.
 
 ---
 
 ## 20. Modifications and Version Updates
 
 ### 20.1. Right to Update
-WIEZ reserves the right to modify or replace these Terms at any time to reflect software updates, economic changes, or new regulatory mandates.
+ARU reserves the right to modify or replace these Terms at any time to reflect software updates, economic changes, or new regulatory mandates.
 
 ### 20.2. Notice of Material Changes
-For material changes, WIEZ will provide at least **fifteen (15) days' advance notice** by displaying a prominent banner across the Platform, sending an in-app notice, or requiring explicit click-to-accept confirmation prior to completing your next transaction.
+For material changes, ARU will provide at least **fifteen (15) days' advance notice** by displaying a prominent banner across the Platform, sending an in-app notice, or requiring explicit click-to-accept confirmation prior to completing your next transaction.
 
 ### 20.3. Continued Use
-Your continued use of WIEZ following the effective date of revised Terms constitutes your full acceptance of the updated Terms.
+Your continued use of ARU following the effective date of revised Terms constitutes your full acceptance of the updated Terms.
 
 ---
 
@@ -417,13 +420,13 @@ Your continued use of WIEZ following the effective date of revised Terms constit
 If any provision of these Terms is determined to be unlawful, void, or unenforceable by an arbitrator or court of competent jurisdiction, that provision shall be deemed severable and shall not affect the validity and enforceability of the remaining provisions.
 
 ### 21.2. No Waiver
-The failure of WIEZ to enforce any right or provision of these Terms shall not constitute a present or future waiver of such right or provision.
+The failure of ARU to enforce any right or provision of these Terms shall not constitute a present or future waiver of such right or provision.
 
 ### 21.3. Assignment
-You may not assign, sublicense, or delegate your rights or obligations under these Terms without WIEZ’s prior written consent. WIEZ may freely assign or transfer its rights and obligations under these Terms without restriction.
+You may not assign, sublicense, or delegate your rights or obligations under these Terms without ARU’s prior written consent. ARU may freely assign or transfer its rights and obligations under these Terms without restriction.
 
 ### 21.4. Entire Agreement
-These Terms, together with the Privacy Policy, Cookie Policy, Community Guidelines, Seller and Brand Terms, and Buyer Marketplace Policy, constitute the complete and exclusive agreement between you and WIEZ with respect to the Platform, superseding all prior oral or written agreements.
+These Terms, together with the Privacy Policy, Cookie Policy, Community Guidelines, Seller and Brand Terms, and Buyer Marketplace Policy, constitute the complete and exclusive agreement between you and ARU with respect to the Platform, superseding all prior oral or written agreements.
 
 ---
 
@@ -431,12 +434,12 @@ These Terms, together with the Privacy Policy, Cookie Policy, Community Guidelin
 
 If you have any questions, compliance inquiries, or concerns regarding these Terms of Service, please contact our teams:
 
-* **General Support & Inquiries**: `support@wiez.com`
-* **Legal & Regulatory Affairs**: `legal@wiez.com`
-* **Dispute & Settlement Resolution**: `disputes@wiez.com`
-* **Intellectual Property & Takedowns**: `copyright@wiez.com`
-* **Security & Vulnerabilities**: `security@wiez.com`
-* **Corporate Entity & Address**: WIEZ Platforms Limited, 12B Admiralty Way, Lekki Phase 1, Lagos, Nigeria.
+* **General Support & Inquiries**: `support@{{LEGAL_EMAIL_DOMAIN}}`
+* **Legal & Regulatory Affairs**: `legal@{{LEGAL_EMAIL_DOMAIN}}`
+* **Dispute & Settlement Resolution**: `disputes@{{LEGAL_EMAIL_DOMAIN}}`
+* **Intellectual Property & Takedowns**: `copyright@{{LEGAL_EMAIL_DOMAIN}}`
+* **Security & Vulnerabilities**: `security@{{LEGAL_EMAIL_DOMAIN}}`
+* **Corporate Entity & Address**: Soteria Genesis Limited, No. 12, Adefarati, Church Street, Power Line, Lekki, Lagos, Nigeria.
 
 ---
 
@@ -450,9 +453,9 @@ The subscription queue rules in this document apply to new custom-order queue pu
 
 Custom-order payment is captured once at placement. Pending and Up Next funds remain held and unavailable as brand earnings until Active; Up Next is a notice and position, never a second garment charge. There is one Up Next seat. Active production and rush times begin at activation, not during waiting; queue position is not a delivery guarantee. Standard garment earnings follow the existing 60% production / 40% completion calculation, with no production release before Active and with existing dispute, verification and payout controls preserved. An internal held balance is an accounting restriction, not a representation of a separately protected bank escrow or provider deposit guarantee.
 
-Ordinary Pending orders are FIFO. Only an Aru or Igwe brand that opts in may offer a paid jump. The separately disclosed fee is 20% of garment subtotal. It buys priority behind the current Up Next and earlier paid jumps, without displacing Up Next. When ordinary eligible orders are waiting, at most two paid-priority orders activate consecutively before one ordinary order. There is no paid jump offer when it provides no priority benefit. Of an earned jump fee, WIEZ receives 10% and the brand 90%; no brand share is earned before Active. Existing duplicate-source restrictions remain; ordering different items from one brand is permitted subject to ordinary checks.
+Ordinary Pending orders are FIFO. Only an Aru or Igwe brand that opts in may offer a paid jump. The separately disclosed fee is 20% of garment subtotal. It buys priority behind the current Up Next and earlier paid jumps, without displacing Up Next. When ordinary eligible orders are waiting, at most two paid-priority orders activate consecutively before one ordinary order. There is no paid jump offer when it provides no priority benefit. Of an earned jump fee, ARU receives 10% and the brand 90%; no brand share is earned before Active. Existing duplicate-source restrictions remain; ordering different items from one brand is permitted subject to ordinary checks.
 
-Both Pending and Up Next expire 42 x 24 hours after committed paid placement. Cards and details show the cancellation countdown and exact deadline. One retain is permitted from 48 hours through exactly 12 hours remaining, inclusive, adding 42 days to the existing deadline while preserving priority. It is unavailable outside that window or after use, activation or cancellation. Shopper and brand reminders are scheduled at 48, 24 and 5 hours. **No outage grace applies:** failed notifications, unavailable notices or a WIEZ outage do not extend the cancellation deadline. The 5-hour notice does not reopen retain.
+Both Pending and Up Next expire 42 x 24 hours after committed paid placement. Cards and details show the cancellation countdown and exact deadline. One retain is permitted from 48 hours through exactly 12 hours remaining, inclusive, adding 42 days to the existing deadline while preserving priority. It is unavailable outside that window or after use, activation or cancellation. Shopper and brand reminders are scheduled at 48, 24 and 5 hours. **No outage grace applies:** failed notifications, unavailable notices or a ARU outage do not extend the cancellation deadline. The 5-hour notice does not reopen retain.
 
 An admin may demote Up Next to Pending with a visible promotion hold. The hold stays until an admin releases it; it does not pause expiry, cancellation rights or the eligible retain window. Ordinary intake closure stops new purchases while already-paid obligations continue. Safety suspension stops promotion and unreleased payouts pending admin review. Removing a listing does not remove paid order snapshots or obligations. A capture completed after eligibility changes remains recorded and is resolved through the applicable cancellation/refund process.
 
@@ -476,18 +479,18 @@ Cancelled history, receipt, deductions, refund progress and permitted order mess
 | Aru | 30,000 | 4 | 5 | 1 | Unlimited | Brand opt-in |
 | Igwe | 50,000 | 6 | 5 | 1 | Unlimited | Brand opt-in |
 
-These are recurring monthly brand subscriptions, requiring express recurring-payment authorization; they are not shopper memberships. A verified brand without a paid subscription in force is on the free plan: it may receive new custom orders with one (1) Active order at a time and two (2) in delivery, with no paid queue jump; capacity campaigns do not change the free plan, while a brand-specific override set by WIEZ still applies. Storefront and standard-commerce access remain available on the free plan. Failed initial or switch payments never create free paid-tier access or erase the previous valid entitlement.
+These are recurring monthly brand subscriptions, requiring express recurring-payment authorization; they are not shopper memberships. A verified brand without a paid subscription in force is on the free plan: it may receive new custom orders with one (1) Active order at a time and two (2) in delivery, with no paid queue jump; capacity campaigns do not change the free plan, while a brand-specific override set by ARU still applies. Storefront and standard-commerce access remain available on the free plan. Failed initial or switch payments never create free paid-tier access or erase the previous valid entitlement.
 
 Existing agreements retain their agreed price snapshot on renewal; a new agreement or tier change uses current pricing. An upgrade applies immediately after verified payment of the difference prorated over the remaining billing period. A downgrade applies at the next renewal, with no refund for the current period. The monthly billing anniversary remains unchanged; a missing calendar day falls back to that month's last day. Billing dates are displayed in Lagos time (Africa/Lagos). Confirm the amount, renewal and effective capacity before payment.
 
-Voluntary cancellation stops future renewal; access remains through the paid-period end. At paid-period expiry the brand moves to the free plan: new custom orders continue at one Active order at a time; orders already Active continue, and waiting paid orders keep their place and move up as the Active seat frees. A failed renewal has seven days to recover at the existing locked price, with authorized retries on days 1, 3 and 7; during that window the brand is on the free plan. WIEZ tells the owner in the app inbox, by push notification and by email when renewal is cancelled; seven, three and one day(s) before a cancelled plan ends; when a renewal fails; three and one day(s) before the recovery window closes; three and one day(s) before a scheduled lower tier takes effect; and when the plan ends. The Studio and the billing workspace also show when the plan ends and how to subscribe again. These notices inform; the plan changes on the stated date whether or not a notice is read. After it ends, a new subscription uses current prices. Payment-method authorization, billing receipts and invoice history remain available through billing support and the billing workspace.
+Voluntary cancellation stops future renewal; access remains through the paid-period end. At paid-period expiry the brand moves to the free plan: new custom orders continue at one Active order at a time; orders already Active continue, and waiting paid orders keep their place and move up as the Active seat frees. A failed renewal has seven days to recover at the existing locked price, with authorized retries on days 1, 3 and 7; during that window the brand is on the free plan. ARU tells the owner in the app inbox, by push notification and by email when renewal is cancelled; seven, three and one day(s) before a cancelled plan ends; when a renewal fails; three and one day(s) before the recovery window closes; three and one day(s) before a scheduled lower tier takes effect; and when the plan ends. The Studio and the billing workspace also show when the plan ends and how to subscribe again. These notices inform; the plan changes on the stated date whether or not a notice is read. After it ends, a new subscription uses current prices. Payment-method authorization, billing receipts and invoice history remain available through billing support and the billing workspace.
 
 Only one global capacity campaign may be active at a time. An automatic campaign ends at its exact configured deadline; a manual campaign remains effective until reset and is labelled accordingly. A brand-specific override wins over tier/campaign capacity and may have an expiry or be removed manually. Reduced capacity preserves existing work and pauses additional promotions until capacity permits. Runway notices, including notices called a free-order period, are informational and grant no financial discount or capacity change without explicit configuration. More than five brand cancellations of waiting orders in one action or a rolling 24 hours raises an admin attention alert; it does not automatically suspend the brand.
 
 
 ### Original-payment conversion for custom-order refunds
 
-When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. WIEZ records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
+When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. ARU records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
 
 An agreed post-Active partial dispute refund returns only the agreed amount. The order continues in its existing production/delivery lane. Each refund is recorded separately, repeat requests cannot duplicate it, and any later full remedy refunds only the remaining refundable balance. Future milestone earnings are reduced for the refunded share; no held milestone becomes payable because of a partial refund.
 

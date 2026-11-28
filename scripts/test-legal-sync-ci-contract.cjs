@@ -57,16 +57,22 @@ function readPages(source) {
 
 const pages = readPages(generated);
 const versionSource = fs.readFileSync(path.join(repoRoot, 'src', 'pages', 'legal', 'legalVersion.ts'), 'utf8');
-assert.match(versionSource, /LEGAL_PAGE_VERSION = "2026\.11\.11-v1\.7"/);
-assert.match(versionSource, /LEGAL_PAGE_EFFECTIVE_DATE = "November 11, 2026"/);
+assert.match(versionSource, /LEGAL_PAGE_VERSION = "2026\.11\.28-v1\.8"/);
+assert.match(versionSource, /LEGAL_PAGE_EFFECTIVE_DATE = "December 13, 2026"/);
 assert.doesNotMatch(versionSource, /LEGAL_PAGES|content:/, 'Checking acceptance must not import policy bodies.');
 assert.equal(pages.length, 9, 'All nine legal policies must be published.');
 for (const page of pages) {
   const fileName = path.basename(page.sourceDocument);
   const markdown = fs.readFileSync(path.join(repoRoot, 'docs', 'legal', 'user-facing', fileName), 'utf8').replace(/\r\n?/g, '\n');
-  assert.equal(page.version, '2026.11.11-v1.7');
-  assert.equal(page.effectiveDate, 'November 11, 2026');
-  assert.equal(page.content, markdown, `${fileName}: published web text must match the isolated-clone source.`);
+  assert.equal(page.version, '2026.11.28-v1.8');
+  assert.equal(page.effectiveDate, 'December 13, 2026');
+  // Mailbox and web-address tokens are filled at build time (default weaz.me).
+  const expected = markdown
+    .replace(/\{\{LEGAL_EMAIL_DOMAIN\}\}/g, process.env.LEGAL_EMAIL_DOMAIN || 'weaz.me')
+    .replace(/\{\{LEGAL_WEB_DOMAIN\}\}/g, process.env.LEGAL_WEB_DOMAIN || 'weaz.me');
+  assert.equal(page.content, expected, `${fileName}: published web text must match the isolated-clone source.`);
+  assert.doesNotMatch(page.content, /\{\{LEGAL_/, `${fileName}: no unfilled legal token may be published.`);
+  assert.doesNotMatch(page.content, /\bWIEZ\b(?!_)|\bWiez\b|wiez\.com|[Tt]hreadly/, `${fileName}: published text must use ARU only (storage-key identifiers excepted).`);
   assert.match(markdown, /2026\.10\.23-v1\.6/);
   assert.match(markdown, /mandatory consumer rights/);
   assert.match(markdown, /Custom-order subscription queue terms/);

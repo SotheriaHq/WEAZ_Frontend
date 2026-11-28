@@ -1,20 +1,20 @@
-# WIEZ Account and Data Deletion Policy
+# ARU Account and Data Deletion Policy
 
-Version: `2026.11.11-v1.7`
+Version: `2026.11.28-v1.8`
 
-Effective Date: November 11, 2026
+Effective Date: December 13, 2026
 
-Governing Entities: WIEZ Technology Ltd. (Nigeria) & Global Operating Affiliates
+Governing Entities: Soteria Genesis Limited (Nigeria), operator of ARU
 
-Privacy & Deletion Desk: `privacy@wiez.com` / `dpo@wiez.com`
+Privacy & Deletion Desk: `privacy@{{LEGAL_EMAIL_DOMAIN}}` / `dpo@{{LEGAL_EMAIL_DOMAIN}}`
 
-Web Deletion Portal: [wiez.com/account/delete](https://wiez.com/account/delete)
+Web Deletion Portal: [{{LEGAL_WEB_DOMAIN}}/account/delete](https://{{LEGAL_WEB_DOMAIN}}/account/delete)
 
 ---
 
 ## 1. Purpose, Scope, and Regulatory Compliance
 
-This Account and Data Deletion Policy ("Policy") provides a transparent, legally binding explanation of the account closure, data pseudonymization, cryptographic erasure, and statutory record retention mechanisms deployed across the WIEZ ecosystem (web, iOS, Android, and API).
+This Account and Data Deletion Policy ("Policy") provides a transparent, legally binding explanation of the account closure, data pseudonymization, cryptographic erasure, and statutory record retention mechanisms deployed across the ARU ecosystem (web, iOS, Android, and API).
 
 This Policy is formulated in strict compliance with:
 * **Apple App Store Review Guidelines (Guideline 5.1.1(v) — Account Deletion)**;
@@ -28,7 +28,7 @@ This Policy is formulated in strict compliance with:
 
 ## 2. In-App and Web Deletion Mechanisms
 
-In compliance with mobile platform store guidelines and global privacy standards, WIEZ provides self-service, easily discoverable account deletion pathways across all supported platforms:
+In compliance with mobile platform store guidelines and global privacy standards, ARU provides self-service, easily discoverable account deletion pathways across all supported platforms:
 
 ### 2.1. Mobile Application (iOS & Android)
 1. Navigate to **Account / Profile** > **Settings** (gear icon);
@@ -38,7 +38,7 @@ In compliance with mobile platform store guidelines and global privacy standards
 5. Upon confirmation, the app executes immediate session termination, clearing local tokens from the device's hardware enclave (`expo-secure-store`).
 
 ### 2.2. Web Platform & Dedicated Deletion Portal
-Users without active access to mobile devices may initiate deletion via the web portal at [wiez.com/account/delete](https://wiez.com/account/delete) or by emailing a verified deletion request to `privacy@wiez.com`.
+Users without active access to mobile devices may initiate deletion via the web portal at [{{LEGAL_WEB_DOMAIN}}/account/delete](https://{{LEGAL_WEB_DOMAIN}}/account/delete) or by emailing a verified deletion request to `privacy@{{LEGAL_EMAIL_DOMAIN}}`.
 
 ---
 
@@ -60,12 +60,12 @@ To protect marketplace integrity, prevent escrow abandonment, and comply with co
 
 ## 4. Technical Architecture: Soft Deactivation and Cryptographic Pseudonymization
 
-Under Nigerian corporate law (CAMA 2020), anti-money laundering statutes (SCUML), and international financial audit standards, e-commerce platforms must preserve unbroken transaction ledgers. To balance statutory retention duties with user privacy rights, WIEZ utilizes **irreversible cryptographic pseudonymization** rather than raw database row deletion.
+Under Nigerian corporate law (CAMA 2020), anti-money laundering statutes (SCUML), and international financial audit standards, e-commerce platforms must preserve unbroken transaction ledgers. To balance statutory retention duties with user privacy rights, ARU utilizes **irreversible cryptographic pseudonymization** rather than raw database row deletion.
 
 1. **An active user account.**
 2. **Immediate token revocation**, once you initiate deletion and pass the security checks: refresh tokens are purged and biometric keys are invalidated.
 3. **Identifier replacement**, in a single database transaction (`deleteOwnAccount()`):
-    * email replaced with `deleted+{timestamp}-{uuid}@wiez.local`;
+    * email replaced with an anonymous, non-routable placeholder address;
     * username replaced with `deleted_{timestamp}`;
     * password hash nullified and credential status set to `DEACTIVATED`;
     * profile PII purged — phone, addresses, avatars, and sizing profiles.
@@ -79,14 +79,14 @@ Under Nigerian corporate law (CAMA 2020), anti-money laundering statutes (SCUML)
 
 ### 4.2. What Is Pseudonymized:
 1. **User Table Record**: The database record remains structurally intact to preserve foreign-key relational integrity in order ledgers, but the `email` is overwritten with `deleted+{timestamp}-{id}@wiez.local`, the `username` is overwritten with `deleted_{timestamp}`, and `status` is permanently set to `DEACTIVATED`;
-2. **Public Reviews & Ratings**: Product reviews authored by the user remain visible to assist other buyers, but the author attribution is permanently replaced with "Verified WIEZ Shopper" and all links to the profile are removed.
+2. **Public Reviews & Ratings**: Product reviews authored by the user remain visible to assist other buyers, but the author attribution is permanently replaced with "Verified ARU Shopper" and all links to the profile are removed.
 
 ---
 
 ## 5. Brand Storefronts, Products, and Collaborative Workspaces
 
 When a Brand Owner or Designer initiates account deletion:
-1. **Digital Storefront Deactivation**: The Brand's public storefront (`wiez.com/@brandname`) is immediately taken offline (`isStoreOpen: false`);
+1. **Digital Storefront Deactivation**: The Brand's public storefront (`{{LEGAL_WEB_DOMAIN}}/@brandname`) is immediately taken offline (`isStoreOpen: false`);
 2. **Product Unlisting**: All active ready-to-wear products and bespoke custom service listings are unlisted from the Market and search index;
 3. **Runway Portfolio Handling**: Public runway lookbooks authored by the Brand are unlinked from search discovery and archived;
 4. **Collaborative Collections**: For shared collections featuring co-designers, primary ownership must be transferred to a verified co-creator prior to deletion. If no transfer occurs, the shared collection is converted to an unlisted archive.
@@ -95,7 +95,7 @@ When a Brand Owner or Designer initiates account deletion:
 
 ## 6. Statutory Data Retention Schedule
 
-Pursuant to GDPR Article 17(3)(b),(e) and NDPA Section 34(2), the right to erasure does not apply to data that WIEZ is legally required to retain for regulatory compliance, tax administration, fraud prevention, or legal defense. 
+Pursuant to GDPR Article 17(3)(b),(e) and NDPA Section 34(2), the right to erasure does not apply to data that ARU is legally required to retain for regulatory compliance, tax administration, fraud prevention, or legal defense. 
 
 The following statutory retention periods apply:
 
@@ -114,8 +114,8 @@ The following statutory retention periods apply:
 
 ## 7. Third-Party Service Providers and Sub-Processor Erasure
 
-Upon processing a deletion request, WIEZ automatically propagates deletion instructions to our authorized infrastructure and payment sub-processors:
-* **Payment Gateways (Paystack)**: Tokenized customer profiles are detached from WIEZ merchant accounts. Note that payment processors maintain their own independent statutory banking retention obligations under CBN, PCI-DSS, and FinCEN regulations;
+Upon processing a deletion request, ARU automatically propagates deletion instructions to our authorized infrastructure and payment sub-processors:
+* **Payment Gateways (Paystack)**: Tokenized customer profiles are detached from ARU merchant accounts. Note that payment processors maintain their own independent statutory banking retention obligations under CBN, PCI-DSS, and FinCEN regulations;
 * **Media Storage (Cloudflare R2 / Cloudflare CDN)**: Profile images, private measurement snapshots, and custom order sketches are permanently deleted from object storage, with CDN edge cache invalidation completed within 48 hours;
 * **Transactional Email & Push (Resend / AWS SES / Firebase)**: Marketing suppression lists are updated to permanently prevent any subsequent promotional emails or push notifications.
 
@@ -125,12 +125,12 @@ Upon processing a deletion request, WIEZ automatically propagates deletion instr
 
 ### 8.1. 30-Day Soft Deactivation & Reactivation Window
 * **30-Day Cooling-Off Period**: When you submit an account closure request, your account enters an immediate **30-day soft deactivation status**. During this window, your profile and listings are completely hidden from public view and sessions are terminated;
-* **Submitting a Reactivation Request**: If you change your mind within thirty (30) calendar days, you may log in and submit an **Account Reactivation Request (`AccountReactivationRequest`)** or email `privacy@wiez.com` from your registered email address to restore your account, active bag, and saved fitting cards without loss of data;
+* **Submitting a Reactivation Request**: If you change your mind within thirty (30) calendar days, you may log in and submit an **Account Reactivation Request (`AccountReactivationRequest`)** or email `privacy@{{LEGAL_EMAIL_DOMAIN}}` from your registered email address to restore your account, active bag, and saved fitting cards without loss of data;
 * **Permanent Pseudonymization**: If no reactivation request is submitted within thirty (30) days, the system executes final, irreversible cryptographic pseudonymization as detailed in Section 4.
 
 ### 8.2. Irreversibility & Re-Registration
-* **Post-Grace Permanence**: Once the 30-day window expires and cryptographic pseudonymization occurs, **the action is permanent and irreversible**. WIEZ technical support cannot restore deleted profiles, saved wishlists, measurement cards, or discount credits;
-* **Re-registration**: Users may register a new account on WIEZ at any time using their original email address or phone number. However, the newly created account will be completely unlinked from the historical, pseudonymized profile and will start with a fresh user ID and clean history.
+* **Post-Grace Permanence**: Once the 30-day window expires and cryptographic pseudonymization occurs, **the action is permanent and irreversible**. ARU technical support cannot restore deleted profiles, saved wishlists, measurement cards, or discount credits;
+* **Re-registration**: Users may register a new account on ARU at any time using their original email address or phone number. However, the newly created account will be completely unlinked from the historical, pseudonymized profile and will start with a fresh user ID and clean history.
 
 
 ---
@@ -138,25 +138,25 @@ Upon processing a deletion request, WIEZ automatically propagates deletion instr
 ## 9. Comprehensive Data Rights Requests (Access, Portability, Rectification)
 
 Prior to initiating account deletion, users may exercise their full suite of data protection rights under GDPR, NDPA, and CCPA:
-1. **Data Portability (GDPR Art. 20 / NDPA Sec. 32)**: You may request a machine-readable export (JSON format) of your complete account history, including past order invoices, custom commission specifications, and active sizing profiles by emailing `privacy@wiez.com`;
+1. **Data Portability (GDPR Art. 20 / NDPA Sec. 32)**: You may request a machine-readable export (JSON format) of your complete account history, including past order invoices, custom commission specifications, and active sizing profiles by emailing `privacy@{{LEGAL_EMAIL_DOMAIN}}`;
 2. **Rectification (GDPR Art. 16 / NDPA Sec. 33)**: You may update or correct inaccurate profile, billing, or measurement information directly within the app settings.
 
 ---
 
 ## 10. Protection of Minors
 
-WIEZ does not knowingly permit individuals under the age of 18 (or the age of majority in their jurisdiction) to hold active accounts. If WIEZ discovers that an underage user has created an account, WIEZ will immediately execute unilateral account deactivation and data pseudonymization in accordance with this Policy.
+ARU does not knowingly permit individuals under the age of 18 (or the age of majority in their jurisdiction) to hold active accounts. If ARU discovers that an underage user has created an account, ARU will immediately execute unilateral account deactivation and data pseudonymization in accordance with this Policy.
 
-Parents or legal guardians who become aware that a minor has submitted personal data to WIEZ should immediately contact `privacy@wiez.com` for expedited priority removal.
+Parents or legal guardians who become aware that a minor has submitted personal data to ARU should immediately contact `privacy@{{LEGAL_EMAIL_DOMAIN}}` for expedited priority removal.
 
 ---
 
 ## 11. Policy Modifications and Store Compliance Notifications
 
-WIEZ regularly audits this Policy to ensure ongoing alignment with mobile app store policies (Apple App Store & Google Play Store) and evolving data privacy statutes. When material updates are made:
+ARU regularly audits this Policy to ensure ongoing alignment with mobile app store policies (Apple App Store & Google Play Store) and evolving data privacy statutes. When material updates are made:
 * The `Version` and `Effective Date` will be updated;
 * Active users will receive in-app notice prior to enforcement;
-* An archive of previous policy versions is maintained at [wiez.com/legal/archive](https://wiez.com/legal/archive).
+* An archive of previous policy versions is maintained at [{{LEGAL_WEB_DOMAIN}}/legal/archive](https://{{LEGAL_WEB_DOMAIN}}/legal/archive).
 
 ---
 
@@ -164,16 +164,16 @@ WIEZ regularly audits this Policy to ensure ongoing alignment with mobile app st
 
 For all questions regarding account deletion, data erasure, portability requests, or regulatory privacy inquiries, please contact our dedicated Data Protection team:
 
-* **Data Protection Officer (DPO)**: `dpo@wiez.com`
-* **Privacy & Deletion Desk**: `privacy@wiez.com`
-* **General User Support**: `support@wiez.com`
-* **Legal & Regulatory Inquiries**: `legal@wiez.com`
+* **Data Protection Officer (DPO)**: `dpo@{{LEGAL_EMAIL_DOMAIN}}`
+* **Privacy & Deletion Desk**: `privacy@{{LEGAL_EMAIL_DOMAIN}}`
+* **General User Support**: `support@{{LEGAL_EMAIL_DOMAIN}}`
+* **Legal & Regulatory Inquiries**: `legal@{{LEGAL_EMAIL_DOMAIN}}`
 * **Mailing Address**:  
-  **WIEZ Technology Ltd.**  
+  **Soteria Genesis Limited**  
   Attn: Data Protection Officer  
-  12B Admiralty Way, Lekki Phase 1,  
+  No. 12, Adefarati, Church Street, Power Line, Lekki,  
   Lagos, Nigeria  
-* **Dedicated Deletion Portal**: [wiez.com/account/delete](https://wiez.com/account/delete)
+* **Dedicated Deletion Portal**: [{{LEGAL_WEB_DOMAIN}}/account/delete](https://{{LEGAL_WEB_DOMAIN}}/account/delete)
 
 ---
 
@@ -189,7 +189,7 @@ Cancelling a brand subscription stops future renewal and keeps access until paid
 
 ### Original-payment conversion for custom-order refunds
 
-When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. WIEZ records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
+When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. ARU records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
 
 An agreed post-Active partial dispute refund returns only the agreed amount. The order continues in its existing production/delivery lane. Each refund is recorded separately, repeat requests cannot duplicate it, and any later full remedy refunds only the remaining refundable balance. Future milestone earnings are reduced for the refunded share; no held milestone becomes payable because of a partial refund.
 
