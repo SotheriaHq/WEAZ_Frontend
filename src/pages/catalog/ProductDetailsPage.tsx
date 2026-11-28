@@ -12,6 +12,7 @@ import {
   Ruler,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { toToastMessage } from '@/utils/errorMessage';
 import { AnimatePresence, motion } from 'framer-motion';
 import { MuseLoader } from '@/components/loaders/MuseLoader';
 import { useDispatch, useSelector } from 'react-redux';
@@ -466,7 +467,7 @@ export default function ProductDetailsPage({ resolvedProductId }: ProductDetails
         toast.success('Added to wishlist');
       }
     } catch (error: any) {
-      toast.error(error || 'Failed to update wishlist');
+      toast.error(toToastMessage(error, 'Failed to update wishlist'));
     } finally {
       setWishlistBusy(false);
     }
@@ -502,7 +503,7 @@ export default function ProductDetailsPage({ resolvedProductId }: ProductDetails
       setStartingCustomOrder(true);
       await beginCustomFlow({ id: product.id, name: product.title });
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Unable to open custom-order checkout.');
+      toast.error(toToastMessage(error, 'Unable to open custom-order checkout.'));
     } finally {
       setStartingCustomOrder(false);
     }
@@ -599,7 +600,7 @@ export default function ProductDetailsPage({ resolvedProductId }: ProductDetails
       });
       toast.success('Measurements saved & bagged!');
     } catch (err: any) {
-      toast.error(err || 'Failed to bag item');
+      toast.error(toToastMessage(err, 'Failed to bag item'));
     } finally {
       setSavingMeasurements(false);
     }

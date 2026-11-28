@@ -132,3 +132,28 @@ export function getFriendlyErrorMessage(
 
   return rawMsg || fallback;
 }
+
+/**
+ * The only thing a toast may be given for a failure: a non-empty string.
+ *
+ * Handlers used to call `toast.error(error || 'Failed to …')`. When `error`
+ * was an AxiosError or a rejected thunk object, sonner rendered it as a React
+ * child, React threw inside <Toaster>, and the root error boundary replaced
+ * the whole app (WIEZ-P01B-0001). An array `message` (validation errors) did
+ * the same. This always returns readable copy, whatever was thrown.
+ */
+export function toToastMessage(error: unknown, fallback: string): string {
+  if (typeof error === 'string') {
+    const text = error.trim();
+    return text && !isTechnicalMessage(text) ? text : fallback;
+  }
+  // A 401 here is an expired session, not a wrong password.
+  if (isAxiosError(error) && error.response?.status === 401) {
+    return 'Please sign in to continue.';
+  }
+  const message = getFriendlyErrorMessage(error, fallback);
+  if (typeof message !== 'string' || !message.trim()) return fallback;
+  // "Request failed with status code 400" is axios talking, not the server.
+  if (isAxiosError(error) && message === error.message) return fallback;
+  return message;
+}

@@ -5,6 +5,7 @@ import type { AppDispatch, RootState } from '@/store';
 import { addToWishlist, removeFromWishlist } from '@/features/wishlistSlice';
 import { brandApi } from '@/api/BrandApi';
 import { toast } from 'sonner';
+import { toToastMessage } from '@/utils/errorMessage';
 import type { SizingMode } from '@/types/sizing';
 import type { CatalogEntityType } from '@/constants/catalogDomain';
 import { PriceEstimate } from '@/currency/PriceEstimate';
@@ -295,7 +296,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
         toast.success('Added to wishlist');
       }
     } catch (error: any) {
-      toast.error(error || 'Failed to update wishlist');
+      toast.error(toToastMessage(error, 'Failed to update wishlist'));
     } finally {
       setWishlistLoading(false);
     }
@@ -322,7 +323,7 @@ export const StoreProductCard: React.FC<StoreProductCardProps> = ({
     try {
       await bagProduct({ id: product.id, name: product.name });
     } catch (error: any) {
-      toast.error(error || 'Failed to bag item');
+      toast.error(toToastMessage(error, 'Failed to bag item'));
     }
   };
 

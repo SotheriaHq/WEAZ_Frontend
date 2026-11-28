@@ -4,6 +4,7 @@ import { X, Heart, ShoppingBag, Trash2, Sparkles, AlertTriangle, AlertCircle } f
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import { toToastMessage } from '@/utils/errorMessage';
 import type { AppDispatch, RootState } from '@/store';
 import {
   closeWishlistDrawer,
@@ -70,7 +71,7 @@ const WishlistDrawer: React.FC = () => {
       await dispatch(removeFromWishlist(productId)).unwrap();
       toast.success('Removed from wishlist');
     } catch (error: any) {
-      toast.error(error || 'Failed to remove item');
+      toast.error(toToastMessage(error, 'Failed to remove item'));
     }
   };
 
@@ -161,7 +162,7 @@ const WishlistDrawer: React.FC = () => {
       dispatch(closeWishlistDrawer());
       await bagProduct({ id: product.id, name: product.name });
     } catch (error: any) {
-      toast.error(error || 'Failed to bag item');
+      toast.error(toToastMessage(error, 'Failed to bag item'));
     }
   };
 
