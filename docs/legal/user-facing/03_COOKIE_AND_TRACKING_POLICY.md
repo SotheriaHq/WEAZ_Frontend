@@ -1,17 +1,17 @@
-# WIEZ Master Cookie, Local Storage, and Device Telemetry Directive
+# ARU Cookie, Local Storage, and Device Telemetry Directive
 
-**Effective Date:** November 11, 2026
+**Effective Date:** December 13, 2026
 
-**Document Version:** 2026.11.11-v1.7
+**Document Version:** 2026.11.28-v1.8
 
-**Applies To:** Web Applications (`wiez.com`, `fthreadly`), Mobile Applications (iOS / Android / `threadly-mobile`), Brand Studio Workspaces, Embedded WebViews, and all platform APIs.
+**Applies To:** Web Applications (`{{LEGAL_WEB_DOMAIN}}`), Mobile Applications (iOS / Android), Brand Studio Workspaces, Embedded WebViews, and all platform APIs.
 
 ---
 
 ## 1. Scope, Operational Architecture, and Philosophy
 
 ### 1.1. Scope of This Directive
-This Master Cookie, Local Storage, and Device Telemetry Directive ("**Cookie Policy**" or "**Policy**") provides an exhaustive technical explanation of how **WIEZ Platforms Limited** (together with its subsidiaries, affiliates, successors, and assigns, "**WIEZ**", "**we**", "**us**", or "**our**") deploys, reads, and manages cookies, browser web storage, mobile secure keychains, device caches, and first-party telemetry across:
+This Master Cookie, Local Storage, and Device Telemetry Directive ("**Cookie Policy**" or "**Policy**") provides an exhaustive technical explanation of how **Soteria Genesis Limited** (together with its subsidiaries, affiliates, successors, and assigns, "**ARU**", "**we**", "**us**", or "**our**") deploys, reads, and manages cookies, browser web storage, mobile secure keychains, device caches, and first-party telemetry across:
 * **The Runway**: Our visual social media feed for fashion lookbooks, video reels, interactive comments, and creator engagements.
 * **The Market**: Our multi-vendor fashion e-commerce marketplace connecting independent fashion brands with global shoppers.
 * **The Custom Tailoring Engine**: Our bespoke garment configuration system utilizing 38-point ISO 8559 measurement schemas and interactive SVG body silhouette visualizers.
@@ -26,7 +26,7 @@ When we refer to "Cookies and Storage Technologies," we encompass five distinct 
 5. **In-App WebView Session Bridges**: Cryptographically isolated webview containers (`useStudioNativeNavBridge` / `useEmbeddedSurface`) bridging authenticated mobile states to merchant studio interfaces.
 
 ### 1.3. Fundamental Tracking & Privacy Commitments
-* **Zero Third-Party Advertising Pixels**: WIEZ **does not** deploy third-party behavioral advertising trackers (such as Meta Pixel, TikTok Pixel, Google Ads Remarketing, or Criteo tags) that follow your browsing across external websites.
+* **Zero Third-Party Advertising Pixels**: ARU **does not** deploy third-party behavioral advertising trackers (such as Meta Pixel, TikTok Pixel, Google Ads Remarketing, or Criteo tags) that follow your browsing across external websites.
 * **Nothing Optional Before You Choose**: On the web, analytics start only after you select **Accept all** or switch **Analytics** on. This covers our first-party discovery signals and, where we have enabled them, Google Analytics and Cloudflare Web Analytics (Section 6.1). In the app, discovery signals and performance tracing start only after you select **Allow**. Rejecting is as easy as accepting, and optional items start switched off.
 * **Purpose Limitation**: Essential storage is used only to keep you signed in, protect your account, complete an add-to-bag you started, and remember your settings and cookie choice.
 
@@ -34,7 +34,7 @@ When we refer to "Cookies and Storage Technologies," we encompass five distinct 
 
 ## 2. Exhaustive Technical Cookie & Storage Directory
 
-The table below provides a complete, field-by-field register of every cookie, local storage key, and device cache utilized across the WIEZ application ecosystem:
+The table below provides a complete, field-by-field register of every cookie, local storage key, and device cache utilized across the ARU application ecosystem:
 
 | Technical Key / Identifier | Storage Mechanism | Surface | TTL / Life | Exact Technical Purpose & Legal Classification |
 | --- | --- | --- | --- | --- |
@@ -104,7 +104,7 @@ To ensure instant navigation and smooth 60fps media scrolling across fashion loo
 
 ## 4. First-Party Telemetry & Discovery Signals (`marketSignalQueue`)
 
-WIEZ utilizes a proprietary, client-side first-party telemetry system (`fthreadly/src/services/marketSignalQueue.ts`) to optimize the Runway discovery feed and catalog ranking:
+ARU utilizes a proprietary, client-side first-party telemetry system to optimize the Runway discovery feed and catalog ranking:
 
 On the web and in the app, this system runs only after you allow analytics (Section 9.2).
 
@@ -114,6 +114,8 @@ A signal passes through four stages before it reaches us:
 2. **De-duplication window**: a 30-second window collapses repeats, and a noisy-signal filter discards the rest.
 3. **Local buffer queue**: up to 100 items are held on your device and flushed in batches of at most 25 every 5 seconds.
 4. **Backend ingestion**: the batch is used to rank your Runway recommendations. There is **zero third-party syndication** of these signals.
+
+**Personalisation (when switched on).** If you are signed in and have not chosen "Don't personalise my Market", discovery signals from your devices are linked to your account and kept for 30 days (Privacy Policy §11.1). Signals sent before you sign in stay linked to the random browser or install ID and are not merged into your account.
 
 ### 4.1. Granular Signal Event Types
 Our systems log the following specific user engagement events:
@@ -131,21 +133,21 @@ exact number of seconds you spent on an item is never stored.
 * **De-duplication Window (`wiez.market.signalRecent.v1`)**: Rapid repeated impressions (such as scrolling past the same lookbook multiple times within 30 seconds) are automatically suppressed.
 * **Batch Flushing**: Signals are flushed to the backend in batches of up to 25 events every 5,000 milliseconds (`flushWebMarketSignals`).
 * **Exponential Backoff Retry**: If a network interruption occurs, the client retries failed batches with exponential backoff (base 2s, maximum 60s, up to 5 attempts) before dropping stale signals older than 24 hours.
-* **Zero External Syndication**: Signals are transmitted directly to WIEZ API clusters and are never shared with or sold to third-party ad exchanges.
+* **Zero External Syndication**: Signals are transmitted directly to ARU API clusters and are never shared with or sold to third-party ad exchanges.
 
 ---
 
 ## 5. Mobile Application Storage and In-App WebView Bridges
 
 ### 5.1. Mobile Sandboxed Storage Architecture
-The native mobile application (`threadly-mobile`) adheres to strict platform security guidelines:
+The native mobile application adheres to strict platform security guidelines:
 * **iOS Sandbox**: All app data, SQLite databases, and `AsyncStorage` files reside within the application's sandboxed container directory (`Application Support` and `Caches`).
-* **Android Private Storage**: App data is stored within private internal storage (`/data/data/com.wiez.app/`) with Unix file permissions restricting access exclusively to the WIEZ process UID.
+* **Android Private Storage**: App data is stored within private internal storage with Unix file permissions restricting access exclusively to the ARU process UID.
 
 ### 5.2. Brand Studio Embedded WebView Bridge
 When a mobile designer opens merchant tools, financial dashboards, or advanced lookbook editors (`useStudioNativeNavBridge` / `useEmbeddedSurface`):
 * The native app securely synchronizes the authenticated session state into the embedded WebView (`WKWebView` on iOS, `Android System WebView` on Android).
-* **Isolation Guarantee**: The WebView session is completely isolated within the WIEZ app container. It does not share cookies, browsing history, or storage with external mobile web browsers (such as Safari or Chrome).
+* **Isolation Guarantee**: The WebView session is completely isolated within the ARU app container. It does not share cookies, browsing history, or storage with external mobile web browsers (such as Safari or Chrome).
 
 ---
 
@@ -163,12 +165,12 @@ If you turn Analytics off on the web, we stop these services, delete the Google 
 When you complete checkout via Paystack:
 * Payment forms and 3D Secure / OTP verification modals are rendered within isolated, PCI-DSS Level 1 compliant iframes.
 * Payment providers may deploy strictly necessary fraud-prevention and session cookies within their own domain sandboxes.
-* WIEZ has no technical access to, does not read, and does not store the internal security cookies of payment gateways.
+* ARU has no technical access to, does not read, and does not store the internal security cookies of payment gateways.
 
 ### 6.3. Currency Estimates and Location Lists
-To show prices in a familiar currency, WIEZ uses the country your internet connection comes from, as reported by our hosting provider (Cloudflare). We use only the country, only to suggest a currency, and we do not store it. We never ask for your precise location for this. You can choose a currency yourself in **Settings > Currency**. Other currencies are estimates; you always pay in Naira (NGN).
+To show prices in a familiar currency, ARU uses the country your internet connection comes from, as reported by our hosting provider (Cloudflare). We use only the country, only to suggest a currency, and we do not store it. We never ask for your precise location for this. You can choose a currency yourself in **Settings > Currency**. Other currencies are estimates; you always pay in Naira (NGN).
 
-Country, state, and city lists in address and profile forms are provided by WIEZ. Your browser and the app do not contact third-party location services to build them.
+Country, state, and city lists in address and profile forms are provided by ARU. Your browser and the app do not contact third-party location services to build them.
 
 ### 6.4. Google Sign-In
 Google's sign-in script (`accounts.google.com`) loads when you choose **Continue with Google**. If you allow **Faster Google sign-in** in your cookie choices, it loads as soon as a sign-in page opens, so a single tap is enough. Google may set its own cookies on its domain, under Google's privacy policy.
@@ -196,10 +198,10 @@ You maintain full control over cookies and client storage through your browser a
 
 | Control Surface | Management Instructions |
 | --- | --- |
-| **1. Google Chrome** | Settings > Privacy and security > Third-party cookies > See all site data and permissions > Search "wiez.com". |
+| **1. Google Chrome** | Settings > Privacy and security > Third-party cookies > See all site data and permissions > Search "{{LEGAL_WEB_DOMAIN}}". |
 | **2. Apple Safari (macOS & iOS)** | macOS: Safari > Settings > Privacy > Manage Website Data. iOS: Settings > Safari > Advanced > Website Data. |
-| **3. Mozilla Firefox** | Settings > Privacy & Security > Cookies and Site Data > Manage Data > Search "wiez.com". |
-| **4. Mobile Device App Caches** | iOS: Settings > General > iPhone Storage > WIEZ > Offload. Android: Settings > Apps > WIEZ > Storage > Clear Cache. |
+| **3. Mozilla Firefox** | Settings > Privacy & Security > Cookies and Site Data > Manage Data > Search "{{LEGAL_WEB_DOMAIN}}". |
+| **4. Mobile Device App Caches** | iOS: Settings > General > iPhone Storage > ARU > Offload. Android: Settings > Apps > ARU > Storage > Clear Cache. |
 | **5. Cookie & Analytics Choices** | Web: Settings > Privacy > **Change cookie settings**, or the same button on this page and the **Cookie settings** link on the sign-in pages. App: Settings > Privacy controls > **Usage analytics**. |
 | **6. Discovery Signal Reset** | Web: Settings > Market & Feed > **Reset market preferences**. App: Settings > Market preferences > **Reset market preferences**. Turning analytics off also deletes the random browser or install ID and queued signals. |
 
@@ -216,32 +218,32 @@ You maintain full control over cookies and client storage through your browser a
 
 ### 9.2. Cookie Consent Architecture (ePrivacy / GDPR Compliance)
 
-WIEZ's storage and cookie architecture is designed to minimize consent friction while respecting your legal rights:
+ARU's storage and cookie architecture is designed to minimize consent friction while respecting your legal rights:
 
 **Strictly Necessary Storage (No Consent Required)**:
 Storage items classified as strictly necessary under ePrivacy Directive Article 5(3) — specifically, authentication tokens (`refreshToken`, `accessToken`, `WIEZ_ACCESS_TOKEN`, `WIEZ_REFRESH_TOKEN`, `WIEZ_USER`) the pending bag action (`wiez.pendingBagAction.v1`), and your cookie choice (`wiez.consent`) — are deployed on a strictly-necessary exemption basis. These items cannot be opted out of without losing access to core platform functionality (login, checkout, and bespoke tailoring), and do not require prior consent under applicable law.
 
 **Optional Analytics (Consent Required)**:
 The discovery-signal keys (`wiez.market.anonymousSessionId.v1`, `wiez.market.signalQueue.v1`, `wiez.market.signalRecent.v1`), the Google Analytics cookies, and the third-party analytics in Section 6.1 are optional. On the web:
-* On your first visit, WIEZ shows a cookie notice with **Accept all**, **Reject optional**, and **Choose what to allow**. Accept and Reject are equally prominent, and every optional switch starts off.
+* On your first visit, ARU shows a cookie notice with **Accept all**, **Reject optional**, and **Choose what to allow**. Accept and Reject are equally prominent, and every optional switch starts off.
 * Until you choose, nothing optional runs: no analytics script loads, no analytics cookie is set, and no discovery signal is stored or sent.
 * You can change your choice at any time from **Settings > Privacy > Change cookie settings**, from the button on this page, or from the **Cookie settings** link on the sign-in pages. Withdrawing is as easy as giving consent and takes effect at once (Section 6.1).
 * Your choice is stored on your device (`wiez.consent`) for twelve months, after which we ask again. It applies to that browser only and is not sent to our servers. We also ask again if we add a new optional purpose.
 * Declining analytics stops discovery signals from that browser, so recommendations rely on actions you take directly (such as likes, saves, and follows) and may be less tailored. It never prevents purchase, checkout, or bespoke tailoring.
-* Inside the WIEZ app's embedded Brand Studio screens, the web cookie notice is not shown and optional web analytics stay off.
+* Inside the ARU app's embedded Brand Studio screens, the web cookie notice is not shown and optional web analytics stay off.
 
 In the app:
-* The first time you open the app, WIEZ asks once whether it may use analytics, with **Allow** and **Don't allow** given equal weight. Until you choose, no discovery signal is recorded, no install ID is created, and performance tracing stays off.
+* The first time you open the app, ARU asks once whether it may use analytics, with **Allow** and **Don't allow** given equal weight. Until you choose, no discovery signal is recorded, no install ID is created, and performance tracing stays off.
 * You can change your choice at any time in **Settings > Privacy controls > Usage analytics**, signed in or not. Turning analytics off takes effect at once and deletes the install ID and any queued signals.
 * Your choice is stored on your device (`wiez.consent`) for twelve months, after which we ask again.
 * This choice is separate from notification permission, which your phone asks for on its own.
 
 ### 9.3. Do Not Track (DNT) Signal Policy
 
-WIEZ honours the browser privacy signals **Global Privacy Control (GPC)** and **Do Not Track (DNT)**:
-* **On the web**: when your browser sends either signal, WIEZ treats it as declining optional analytics, even if you selected **Accept all**. Google Analytics, Cloudflare Web Analytics, Sentry performance tracing, and discovery signals stay off, and the cookie notice shows the Analytics switch as off.
-* **Advertising**: WIEZ deploys no cross-site advertising trackers, so there is nothing further for these signals to switch off.
-* **In the app**: iOS and Android do not send these signals to apps. Use **Settings > Privacy controls > Usage analytics**, or contact `privacy@wiez.com`. WIEZ does not link app data with other companies' apps or websites for advertising, or share it with data brokers, so it does not show Apple's App Tracking Transparency prompt.
+ARU honours the browser privacy signals **Global Privacy Control (GPC)** and **Do Not Track (DNT)**:
+* **On the web**: when your browser sends either signal, ARU treats it as declining optional analytics, even if you selected **Accept all**. Google Analytics, Cloudflare Web Analytics, Sentry performance tracing, and discovery signals stay off, and the cookie notice shows the Analytics switch as off.
+* **Advertising**: ARU deploys no cross-site advertising trackers, so there is nothing further for these signals to switch off.
+* **In the app**: iOS and Android do not send these signals to apps. Use **Settings > Privacy controls > Usage analytics**, or contact `privacy@{{LEGAL_EMAIL_DOMAIN}}`. ARU does not link app data with other companies' apps or websites for advertising, or share it with data brokers, so it does not show Apple's App Tracking Transparency prompt.
 
 ---
 
@@ -257,11 +259,11 @@ We may update this Directive periodically to reflect changes in our technical ar
 
 If you have questions regarding our storage practices, cryptographic security, or telemetry systems:
 
-* **Data Protection Officer (DPO)**: `privacy@wiez.com`
-* **Technical Security Team**: `security@wiez.com`
+* **Data Protection Officer (DPO)**: `privacy@{{LEGAL_EMAIL_DOMAIN}}`
+* **Technical Security Team**: `security@{{LEGAL_EMAIL_DOMAIN}}`
 * **Mailing Address**:  
-  Data Protection Office, WIEZ Platforms Limited  
-  12B Admiralty Way, Lekki Phase 1,  
+  Data Protection Office, Soteria Genesis Limited  
+  No. 12, Adefarati, Church Street, Power Line, Lekki,  
   Lagos, Nigeria.
 
 ---
@@ -278,6 +280,6 @@ The queue may use existing authenticated functional caches to display your posit
 
 ### Original-payment conversion for custom-order refunds
 
-When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. WIEZ records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
+When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. ARU records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
 
 An agreed post-Active partial dispute refund returns only the agreed amount. The order continues in its existing production/delivery lane. Each refund is recorded separately, repeat requests cannot duplicate it, and any later full remedy refunds only the remaining refundable balance. Future milestone earnings are reduced for the refunded share; no held milestone becomes payable because of a partial refund.

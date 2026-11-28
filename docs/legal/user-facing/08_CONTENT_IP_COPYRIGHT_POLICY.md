@@ -1,20 +1,20 @@
-# WIEZ Content, Intellectual Property, and Copyright Policy
+# ARU Content, Intellectual Property, and Copyright Policy
 
-Version: `2026.11.11-v1.7`
+Version: `2026.11.28-v1.8`
 
-Effective Date: November 11, 2026
+Effective Date: December 13, 2026
 
-Governing Entities: WIEZ Technology Ltd. (Nigeria) & Global Operating Affiliates
+Governing Entities: Soteria Genesis Limited (Nigeria), operator of ARU
 
-Designated IP & Copyright Agent: `copyright@wiez.com` / `legal@wiez.com`
+Designated IP & Copyright Agent: `copyright@{{LEGAL_EMAIL_DOMAIN}}` / `legal@{{LEGAL_EMAIL_DOMAIN}}`
 
 ---
 
 ## 1. Scope, Purpose, and Regulatory Foundations
 
-This Content, Intellectual Property, and Copyright Policy ("Policy") governs all creative works, proprietary media, design assets, and commercial listings uploaded, transmitted, licensed, displayed, or sold across the WIEZ fashion and bespoke apparel ecosystem (including the web platform at `wiez.com`, mobile applications, API endpoints, Runway design feed, Market commerce discovery, and direct messaging channels).
+This Content, Intellectual Property, and Copyright Policy ("Policy") governs all creative works, proprietary media, design assets, and commercial listings uploaded, transmitted, licensed, displayed, or sold across the ARU fashion and bespoke apparel ecosystem (including the web platform at `{{LEGAL_WEB_DOMAIN}}`, mobile applications, API endpoints, Runway design feed, Market commerce discovery, and direct messaging channels).
 
-WIEZ is an online marketplace intermediary and creative platform connecting fashion designers, bespoke tailors, independent apparel brands ("Brands"), and clients/buyers ("Buyers"). This Policy is structured in strict compliance with:
+ARU is an online marketplace intermediary and creative platform connecting fashion designers, bespoke tailors, independent apparel brands ("Brands"), and clients/buyers ("Buyers"). This Policy is structured in strict compliance with:
 * **The Nigerian Copyright Act 2022** (specifically Sections 54–56 governing safe harbor protections and notice-and-takedown procedures for online service providers);
 * **The United States Digital Millennium Copyright Act (DMCA)**, 17 U.S.C. § 512;
 * **The European Union Digital Services Act (EU Regulation 2022/2065)** and Directive 2004/48/EC on the enforcement of intellectual property rights;
@@ -25,12 +25,12 @@ WIEZ is an online marketplace intermediary and creative platform connecting fash
 ## 2. Creator Ownership and Limited Platform License
 
 ### 2.1. Retention of Creator Ownership
-WIEZ firmly asserts that **creators, designers, and brands retain 100% of their underlying intellectual property rights** in original fashion sketches, technical garment patterns, photography, brand names, registered logos, lookbooks, bespoke portfolios, and video demonstrations uploaded to the platform. Uploading content to WIEZ does **not** transfer ownership, copyright, or trademark rights to WIEZ.
+ARU firmly asserts that **creators, designers, and brands retain 100% of their underlying intellectual property rights** in original fashion sketches, technical garment patterns, photography, brand names, registered logos, lookbooks, bespoke portfolios, and video demonstrations uploaded to the platform. Uploading content to ARU does **not** transfer ownership, copyright, or trademark rights to ARU.
 
-### 2.2. Limited Operational License to WIEZ
-By submitting, posting, or displaying content on or through WIEZ, you grant WIEZ a non-exclusive, worldwide, royalty-free, transferable, and sublicensable license to host, store, cache, transcode, resize, render, display, reproduce, distribute, and perform such content solely for the technical operation, promotion, search indexing, moderation, and enhancement of the WIEZ services.
+### 2.2. Limited Operational License to ARU
+By submitting, posting, or displaying content on or through ARU, you grant ARU a non-exclusive, worldwide, royalty-free, transferable, and sublicensable license to host, store, cache, transcode, resize, render, display, reproduce, distribute, and perform such content solely for the technical operation, promotion, search indexing, moderation, and enhancement of the ARU services.
 
-This operational license enables WIEZ to:
+This operational license enables ARU to:
 1. Render high-resolution apparel photography and lookbooks across multi-screen client devices (iOS, Android, mobile web, desktop);
 2. Generate CDN-cached previews, video thumbnails, and signed media URLs via secure cloud infrastructure (AES-256 encrypted object storage with HMAC-SHA256 authenticated access);
 3. Index designs, garments, and store collections for Runway algorithm recommendation, Market search filters, and tag discovery;
@@ -38,12 +38,12 @@ This operational license enables WIEZ to:
 5. Preserve encrypted transaction snapshots and dispute media records for legal, tax, and escrow compliance audits.
 
 ### 2.3. Termination of License
-Upon deleting a design, product listing, or store collection from your WIEZ account, this license terminates with respect to future public displays, subject to reasonable processing latencies (up to 48 hours for CDN edge cache purging) and statutory archival requirements (e.g., preservation of order invoice records, dispute evidence, and tax documentation).
+Upon deleting a design, product listing, or store collection from your ARU account, this license terminates with respect to future public displays, subject to reasonable processing latencies (up to 48 hours for CDN edge cache purging) and statutory archival requirements (e.g., preservation of order invoice records, dispute evidence, and tax documentation).
 
 ### 2.4. Moral Rights (Droit Moral) Acknowledgment
 Pursuant to **Section 12 of the Nigerian Copyright Act 2022** and international copyright conventions (Berne Convention Article 6bis):
-* **Inalienable Attribution**: WIEZ acknowledges and respects the moral rights of fashion creators to be identified as the author of their original works (the right of paternity/attribution). WIEZ attributes designer showcases to their respective brand profiles and handles;
-* **Protection of Integrity**: WIEZ warrants that it will not distort, mutilate, modify, or derogatory treat any creator's original design in any manner that is prejudicial to the creator's honor, reputation, or artistic integrity.
+* **Inalienable Attribution**: ARU acknowledges and respects the moral rights of fashion creators to be identified as the author of their original works (the right of paternity/attribution). ARU attributes designer showcases to their respective brand profiles and handles;
+* **Protection of Integrity**: ARU warrants that it will not distort, mutilate, modify, or derogatory treat any creator's original design in any manner that is prejudicial to the creator's honor, reputation, or artistic integrity.
 
 
 ---
@@ -60,7 +60,7 @@ All users (Brands, Designers, Collaborators, and Buyers) represent and warrant t
 
 ## 4. Distinct Content Categories: Runway Designs vs. Market Products
 
-WIEZ maintains strict structural separation between creative showcases and purchasable inventory:
+ARU maintains strict structural separation between creative showcases and purchasable inventory:
 
 | Content Surface | Nature of Asset | Commercial Status | IP Obligations |
 |---|---|---|---|
@@ -73,7 +73,7 @@ WIEZ maintains strict structural separation between creative showcases and purch
 
 ## 5. Counterfeit Goods, Replicas, and Unlawful Copies
 
-WIEZ enforces an absolute, zero-tolerance prohibition against counterfeit apparel, replica luxury goods, and trademark piracy:
+ARU enforces an absolute, zero-tolerance prohibition against counterfeit apparel, replica luxury goods, and trademark piracy:
 * **Definition of Counterfeit**: Any garment, accessory, footwear, textile, or packaging bearing an identical or substantially indistinguishable trademark, logo, monogram, or brand insignia without authorization from the legitimate rights holder;
 * **Prohibited Deceptive Practices**: Using blurred logos, obscured brand badges, misleading product descriptions (e.g., "1:1 mirror quality", "AAA master copy", "unauthorized authentic"), or directing buyers off-platform to complete counterfeit transactions;
 * **Immediate Sanctions**: Any listing identified as counterfeit will be purged immediately without prior notice. Associated escrow payouts will be frozen, and the offending brand account will be subject to Level 5 permanent platform expulsion and law enforcement referral.
@@ -82,29 +82,29 @@ WIEZ enforces an absolute, zero-tolerance prohibition against counterfeit appare
 
 ## 6. Official DMCA / Copyright Takedown Procedure
 
-WIEZ complies with statutory notice-and-takedown frameworks under the Nigerian Copyright Act 2022 (Sections 54–56) and the US DMCA (17 U.S.C. § 512).
+ARU complies with statutory notice-and-takedown frameworks under the Nigerian Copyright Act 2022 (Sections 54–56) and the US DMCA (17 U.S.C. § 512).
 
 ### 6.1. Designated Copyright Agent Contact
 Notices of claimed copyright infringement must be submitted directly to our Designated Agent:
 
-* **Entity**: WIEZ Technology Ltd. — Legal & Intellectual Property Department
+* **Entity**: Soteria Genesis Limited — Legal & Intellectual Property Department
 * **Attn**: Designated Copyright Agent
-* **Email**: `copyright@wiez.com` (cc: `legal@wiez.com`)
-* **Address**: 12B Admiralty Way, Lekki Phase 1, Lagos, Nigeria
+* **Email**: `copyright@{{LEGAL_EMAIL_DOMAIN}}` (cc: `legal@{{LEGAL_EMAIL_DOMAIN}}`)
+* **Address**: No. 12, Adefarati, Church Street, Power Line, Lekki, Lagos, Nigeria
 
 ### 6.2. Required Elements of an Infringement Notice
 To be legally effective, an infringement notice must be in writing and contain the following:
 1. **Physical or Electronic Signature** of the copyright owner or authorized representative;
 2. **Identification of the Copyrighted Work**: A clear description of the original creative work claimed to have been infringed (or a representative list if multiple works are covered);
-3. **Identification of the Infringing Material**: The specific URL(s), product ID, design ID, or deep-link locations on WIEZ where the allegedly infringing material is hosted;
+3. **Identification of the Infringing Material**: The specific URL(s), product ID, design ID, or deep-link locations on ARU where the allegedly infringing material is hosted;
 4. **Complainant Contact Information**: Full legal name, organization, physical address, telephone number, and official email address;
 5. **Good Faith Statement**: A statement that the complainant has a good faith belief that the disputed use is not authorized by the copyright owner, its agent, or the law (including fair use doctrines);
 6. **Accuracy and Perjury Statement**: A statement made under penalty of perjury that the information provided in the notice is accurate and that the complainant is authorized to act on behalf of the copyright owner.
 
 ### 6.3. Platform Response Timeline (Notice Action SLA)
 Upon receiving a complete and valid statutory notice:
-* **Takedown SLA**: WIEZ will expedite review and disable access to or remove the identified material within **24 to 48 business hours**;
-* **Uploader Notification**: WIEZ will promptly notify the affected creator/brand, forwarding a redacted copy of the infringement claim along with instructions regarding the counter-notification process.
+* **Takedown SLA**: ARU will expedite review and disable access to or remove the identified material within **24 to 48 business hours**;
+* **Uploader Notification**: ARU will promptly notify the affected creator/brand, forwarding a redacted copy of the infringement claim along with instructions regarding the counter-notification process.
 
 ---
 
@@ -113,7 +113,7 @@ Upon receiving a complete and valid statutory notice:
 If a creator or brand believes in good faith that their content was removed or disabled as a result of mistake, misidentification, or legitimate rights clearance (e.g., valid commercial license or fair use), they may file a formal Counter-Notification.
 
 ### 7.1. Required Elements of a Counter-Notification
-A valid counter-notification must be sent to `copyright@wiez.com` and must include:
+A valid counter-notification must be sent to `copyright@{{LEGAL_EMAIL_DOMAIN}}` and must include:
 1. **Physical or Electronic Signature** of the uploader;
 2. **Identification of Removed Content**: The specific URL, listing title, or product ID that was removed or disabled;
 3. **Perjury Statement**: A statement under penalty of perjury that the uploader has a good faith belief that the material was removed or disabled as a result of mistake, misidentification, or erroneous claim;
@@ -122,15 +122,15 @@ A valid counter-notification must be sent to `copyright@wiez.com` and must inclu
 
 ### 7.2. Content Restoration Procedure
 Upon receiving a valid Counter-Notification:
-1. WIEZ will forward a copy of the counter-notice to the original complainant within **3 business days**;
-2. The complainant will be informed that WIEZ will restore the removed material within **10 to 14 business days** unless the complainant provides proof of initiating formal legal proceedings seeking a court order against the uploader;
-3. If no proof of filed judicial action is received within 14 business days, WIEZ will restore the content to active platform status.
+1. ARU will forward a copy of the counter-notice to the original complainant within **3 business days**;
+2. The complainant will be informed that ARU will restore the removed material within **10 to 14 business days** unless the complainant provides proof of initiating formal legal proceedings seeking a court order against the uploader;
+3. If no proof of filed judicial action is received within 14 business days, ARU will restore the content to active platform status.
 
 ---
 
 ## 8. Repeat Infringer Policy: The 3-Strike System
 
-In accordance with global statutory standards, WIEZ enforces a strict **Three-Strike Repeat Infringer Policy**:
+In accordance with global statutory standards, ARU enforces a strict **Three-Strike Repeat Infringer Policy**:
 
 1. **Strike 1 — formal warning and listing takedown.**
 2. **Strike 2 — a 14-day storefront freeze and a payout audit**, on a subsequent valid IP complaint.
@@ -138,7 +138,7 @@ In accordance with global statutory standards, WIEZ enforces a strict **Three-St
 
 * **Strike 1 (First Valid Infringement)**: Immediate removal of infringing listing; mandatory written warning issued to account owner; educational compliance reminder.
 * **Strike 2 (Second Valid Infringement within 12 months)**: Immediate listing removal; **14-day suspension** of Brand storefront and new listing capabilities; mandatory audit of all active product catalog items.
-* **Strike 3 (Third Valid Infringement within 12 months)**: **Permanent account termination**; permanent closure of digital storefront; forfeiture of unverified pending promotional credits; permanent prohibition against creating new WIEZ accounts.
+* **Strike 3 (Third Valid Infringement within 12 months)**: **Permanent account termination**; permanent closure of digital storefront; forfeiture of unverified pending promotional credits; permanent prohibition against creating new ARU accounts.
 
 *Note: Egregious bad-faith piracy, bulk counterfeit distribution, or industrial-scale asset scraping may result in immediate permanent expulsion on Strike 1.*
 
@@ -147,13 +147,13 @@ In accordance with global statutory standards, WIEZ enforces a strict **Three-St
 ## 9. Trademark, Industrial Design, and Trade Dress Complaints
 
 ### 9.1. Trademark Infringement
-WIEZ respects registered trademarks. Trademark owners may submit reports regarding unauthorized commercial use of registered marks, logos, brand names, or confusingly similar domain/username registrations. Reports must include:
+ARU respects registered trademarks. Trademark owners may submit reports regarding unauthorized commercial use of registered marks, logos, brand names, or confusingly similar domain/username registrations. Reports must include:
 * Trademark registration certificate number and jurisdiction;
 * Class of goods/services;
 * Evidence of likelihood of consumer confusion in the fashion marketplace.
 
 ### 9.2. Industrial Design and Garment Trade Dress
-Fashion garments frequently blend functional design with creative expression. WIEZ recognizes registered industrial design patents and protected trade dress:
+Fashion garments frequently blend functional design with creative expression. ARU recognizes registered industrial design patents and protected trade dress:
 * Complainants asserting design patent infringement must provide verifiable registration certificates covering the specific garment cut, silhouette ornament, or hardware clasp;
 * Vague or generic design claims over standard apparel cuts (e.g., standard round necklines, basic A-line skirts) will be rejected to protect competitive creator freedom.
 
@@ -161,7 +161,7 @@ Fashion garments frequently blend functional design with creative expression. WI
 
 ## 10. AI-Generated Fashion Designs and Virtual Lookbooks
 
-WIEZ encourages technological innovation while upholding creative provenance:
+ARU encourages technological innovation while upholding creative provenance:
 1. **Mandatory AI Disclosure**: Designers utilizing generative AI tools (e.g., Midjourney, Stable Diffusion, CLO 3D AI) to render conceptual runway designs or fabric patterns must tag listings with the platform's `#AIGenerated` or `AI-Assisted` metadata flag;
 2. **Manufacturability Warranty**: When an AI-rendered design is listed for bespoke custom commissioning or ready-to-wear pre-order, the Brand warrants that it possesses the technical pattern-making capability and textile supply chain to physically manufacture the garment to within platform tolerance standards (±0.75 inches);
 3. **Training Data and Copyright Disclaimers**: Uploaders may not claim exclusive copyright over raw, unedited AI-generated outputs that lack human creative authorship under applicable copyright laws.
@@ -170,8 +170,8 @@ WIEZ encourages technological innovation while upholding creative provenance:
 
 ## 11. Collaborative Projects, Co-Creations, and Guest Designers
 
-1. **Shared Workspaces**: Where multiple designers collaborate on a joint WIEZ collection, one primary account must be designated as the Administrative Brand Owner responsible for license authorization and payout routing;
-2. **Internal IP Disputes**: WIEZ does not adjudicate private ownership splits or royalty disputes between co-designers. Brands must execute written partnership agreements prior to uploading collaborative collections;
+1. **Shared Workspaces**: Where multiple designers collaborate on a joint ARU collection, one primary account must be designated as the Administrative Brand Owner responsible for license authorization and payout routing;
+2. **Internal IP Disputes**: ARU does not adjudicate private ownership splits or royalty disputes between co-designers. Brands must execute written partnership agreements prior to uploading collaborative collections;
 3. **Revocation of Contributor Access**: Brand owners may revoke collaborator access at any time; however, previously fulfilled customer orders and historical lookbook archives remain protected.
 
 ---
@@ -179,13 +179,13 @@ WIEZ encourages technological innovation while upholding creative provenance:
 ## 12. Digital Assets, Media Security, and Scraping Prohibitions
 
 1. **Signed Media URLs**: All private sketches, bespoke client measurement data, and draft design media are protected via time-limited, cryptographically signed URLs. Attempting to bypass URL signatures or access unauthorized media buckets is a criminal violation;
-2. **Automated Scraping Bar**: Scraping, crawling, harvesting, or bulk-downloading designer lookbooks, garment photography, sizing matrices, or pricing data via automated bots, scripts, or AI scrapers without express written authorization from WIEZ is strictly prohibited under our Terms of Service and Computer Misuse laws.
+2. **Automated Scraping Bar**: Scraping, crawling, harvesting, or bulk-downloading designer lookbooks, garment photography, sizing matrices, or pricing data via automated bots, scripts, or AI scrapers without express written authorization from ARU is strictly prohibited under our Terms of Service and Computer Misuse laws.
 
 ---
 
 ## 13. Modifications and Policy Updates
 
-WIEZ reserves the right to modify or update this Policy to reflect changes in intellectual property laws, marketplace technologies, or regulatory mandates. When material amendments occur:
+ARU reserves the right to modify or update this Policy to reflect changes in intellectual property laws, marketplace technologies, or regulatory mandates. When material amendments occur:
 * We will update the `Version` and `Effective Date` at the top of this document;
 * We will notify registered Brands and active creators via platform email and in-app dashboard alert at least **14 calendar days** prior to the effective date;
 * Continued listing or uploading of content following the effective date constitutes full acceptance of the revised Policy.
@@ -196,15 +196,15 @@ WIEZ reserves the right to modify or update this Policy to reflect changes in in
 
 For all intellectual property inquiries, statutory DMCA notices, trademark claims, and counter-notifications, please contact:
 
-* **Email**: `copyright@wiez.com` (cc: `legal@wiez.com`)
-* **Dispute & Escalation Desk**: `disputes@wiez.com`
-* **General Legal Counsel**: `counsel@wiez.com`
+* **Email**: `copyright@{{LEGAL_EMAIL_DOMAIN}}` (cc: `legal@{{LEGAL_EMAIL_DOMAIN}}`)
+* **Dispute & Escalation Desk**: `disputes@{{LEGAL_EMAIL_DOMAIN}}`
+* **General Legal Counsel**: `counsel@{{LEGAL_EMAIL_DOMAIN}}`
 * **Mailing Address**:  
-  **WIEZ Technology Ltd.**  
+  **Soteria Genesis Limited**  
   Attn: Legal & Intellectual Property Counsel  
-  12B Admiralty Way, Lekki Phase 1,  
+  No. 12, Adefarati, Church Street, Power Line, Lekki,  
   Lagos, Nigeria  
-* **Official Web Portal**: [wiez.com/legal/copyright](https://wiez.com/legal/copyright)
+* **Official Web Portal**: [{{LEGAL_WEB_DOMAIN}}/legal/copyright](https://{{LEGAL_WEB_DOMAIN}}/legal/copyright)
 
 ---
 
@@ -216,10 +216,10 @@ The subscription queue rules in this document apply to new custom-order queue pu
 
 ## Removed sources and existing custom-order evidence
 
-Removing or restricting an infringing or unavailable design/product prevents new eligible purchases; it does not delete existing paid order snapshots, payment/refund evidence or the parties' obligations. WIEZ may retain limited source/specification evidence for fulfillment, disputes, copyright claims, financial audit and legal holds under the Privacy Policy. This retention does not grant permission to continue an infringing manufacture or publicly republish removed content. Safety or infringement review may stop promotion and unreleased payouts pending authorized review. Where an order cannot proceed, it is resolved under the applicable order and Payment Policies, with mandatory legal remedies preserved. A resubmission requires a currently permitted source and fresh checks; an archived order is not permission to reorder removed content.
+Removing or restricting an infringing or unavailable design/product prevents new eligible purchases; it does not delete existing paid order snapshots, payment/refund evidence or the parties' obligations. ARU may retain limited source/specification evidence for fulfillment, disputes, copyright claims, financial audit and legal holds under the Privacy Policy. This retention does not grant permission to continue an infringing manufacture or publicly republish removed content. Safety or infringement review may stop promotion and unreleased payouts pending authorized review. Where an order cannot proceed, it is resolved under the applicable order and Payment Policies, with mandatory legal remedies preserved. A resubmission requires a currently permitted source and fresh checks; an archived order is not permission to reorder removed content.
 
 ### Original-payment conversion for custom-order refunds
 
-When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. WIEZ records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
+When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. ARU records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
 
 An agreed post-Active partial dispute refund returns only the agreed amount. The order continues in its existing production/delivery lane. Each refund is recorded separately, repeat requests cannot duplicate it, and any later full remedy refunds only the remaining refundable balance. Future milestone earnings are reduced for the refunded share; no held milestone becomes payable because of a partial refund.

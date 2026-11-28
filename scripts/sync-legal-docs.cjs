@@ -28,9 +28,9 @@ const SOURCE_CANDIDATES = [
 ];
 
 const FILES = [
-  ['TERMS_OF_SERVICE', 'terms', 'Terms and Conditions', '01_TERMS_AND_CONDITIONS.md', 'Operating terms for WIEZ visitors, buyers, creators, brand owners, brand staff, marketplace content, checkout, and protected account actions.'],
-  ['PRIVACY_POLICY', 'privacy', 'Privacy Policy', '02_PRIVACY_POLICY.md', 'How WIEZ collects, uses, discloses, protects, retains, and pseudonymizes account, marketplace, commerce, body measurement, and device data.'],
-  ['COOKIE_POLICY', 'cookies', 'Cookie and Tracking Policy', '03_COOKIE_AND_TRACKING_POLICY.md', 'How WIEZ uses cookies, local storage, mobile SecureStore keychains, and first-party telemetry across web and mobile surfaces.'],
+  ['TERMS_OF_SERVICE', 'terms', 'Terms and Conditions', '01_TERMS_AND_CONDITIONS.md', 'Operating terms for ARU visitors, buyers, creators, brand owners, brand staff, marketplace content, checkout, and protected account actions.'],
+  ['PRIVACY_POLICY', 'privacy', 'Privacy Policy', '02_PRIVACY_POLICY.md', 'How ARU collects, uses, discloses, protects, retains, and pseudonymizes account, marketplace, commerce, body measurement, and device data.'],
+  ['COOKIE_POLICY', 'cookies', 'Cookie and Tracking Policy', '03_COOKIE_AND_TRACKING_POLICY.md', 'How ARU uses cookies, local storage, mobile SecureStore keychains, and first-party telemetry across web and mobile surfaces.'],
   ['COMMUNITY_GUIDELINES', 'community-guidelines', 'Community Guidelines', '04_COMMUNITY_GUIDELINES.md', 'Trust, safety, behavioral standards, and marketplace integrity rules for profiles, stores, designs, reviews, and messaging.'],
   ['SELLER_TERMS', 'seller-terms', 'Seller and Brand Terms', '05_SELLER_BRAND_TERMS.md', 'Commercial terms, 5-point KYC verification, commission schedules, milestone settlements, and fulfillment SLAs for fashion brands and designers.'],
   ['BUYER_POLICY', 'buyer-policy', 'Buyer Marketplace Policy', '06_BUYER_MARKETPLACE_POLICY.md', 'Buyer protections, escrow settlement safety, 72-hour inspection window, bespoke ±0.75-inch fit guarantee, returns, and dispute workflows.'],
@@ -39,8 +39,32 @@ const FILES = [
   ['ACCOUNT_DELETION_POLICY', 'account-deletion', 'Account and Data Deletion Policy', '09_ACCOUNT_DATA_DELETION_POLICY.md', 'Self-service account closure, soft deactivation, cryptographic pseudonymization, and statutory financial retention schedules.'],
 ];
 
-const ver = '2026.11.11-v1.7';
-const eff = 'November 11, 2026';
+const ver = '2026.11.28-v1.8';
+const eff = 'December 13, 2026';
+
+// Contact mailboxes and the web address are build-time settings, so the texts
+// follow a domain change without an edit (owner, 28 Nov 2026: weaz.me until
+// aru.com is live). Only bare host names are accepted.
+const HOST_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+function legalHost(name, fallback) {
+  const value = String(process.env[name] || fallback).trim().toLowerCase();
+  if (!HOST_PATTERN.test(value)) {
+    throw new Error(`${name} must be a bare host name, got: ${value}`);
+  }
+  return value;
+}
+const LEGAL_TOKENS = {
+  LEGAL_EMAIL_DOMAIN: legalHost('LEGAL_EMAIL_DOMAIN', 'weaz.me'),
+  LEGAL_WEB_DOMAIN: legalHost('LEGAL_WEB_DOMAIN', 'weaz.me'),
+};
+function applyLegalTokens(text) {
+  return text.replace(/\{\{(LEGAL_[A-Z_]+)\}\}/g, (match, key) => {
+    if (!Object.prototype.hasOwnProperty.call(LEGAL_TOKENS, key)) {
+      throw new Error(`Unknown legal token ${match}`);
+    }
+    return LEGAL_TOKENS[key];
+  });
+}
 
 const frontendOut = path.join(frontendRoot, 'src', 'pages', 'legal', 'legalDocuments.ts');
 const frontendVersionOut = path.join(path.dirname(frontendOut), 'legalVersion.ts');
@@ -72,7 +96,9 @@ function build(importPath, docsDir, separateVersion = false) {
       version: ver,
       sourceDocument: 'docs/legal/user-facing/' + fileName,
       summary,
-      content: fs.readFileSync(sourcePath, 'utf8').replace(/\r\n?/g, '\n'),
+      content: applyLegalTokens(
+        fs.readFileSync(sourcePath, 'utf8').replace(/\r\n?/g, '\n'),
+      ),
     };
   });
 

@@ -1,17 +1,17 @@
-# WIEZ Master Privacy Policy and Data Governance Directive
+# ARU Privacy Policy and Data Governance Directive
 
-**Effective Date:** November 11, 2026
+**Effective Date:** December 13, 2026
 
-**Document Version:** 2026.11.11-v1.7
+**Document Version:** 2026.11.28-v1.8
 
-**Applies To:** Web (`wiez.com`, `fthreadly`), Mobile Applications (iOS / Android / `threadly-mobile`), Brand Studio Workspaces, Escrow Ledger Services, and all platform APIs.
+**Applies To:** Web (`{{LEGAL_WEB_DOMAIN}}`), Mobile Applications (iOS / Android), Brand Studio Workspaces, Escrow Ledger Services, and all platform APIs.
 
 ---
 
 ## 1. Scope, Data Controller, and Core Commitments
 
 ### 1.1. Scope of This Policy
-This Master Privacy Policy and Data Governance Directive ("**Privacy Policy**" or "**Policy**") governs the collection, processing, storage, transfer, and safeguarding of personal data by **WIEZ Platforms Limited** (together with its subsidiaries, affiliates, successors, and assigns, "**WIEZ**", "**we**", "**us**", or "**our**"). This Policy applies to all individuals who access, register, browse, or transact across:
+This Privacy Policy and Data Governance Directive ("**Privacy Policy**" or "**Policy**") governs the collection, processing, storage, transfer, and safeguarding of personal data by **Soteria Genesis Limited**, the company that operates ARU (together with its subsidiaries, affiliates, successors, and assigns, "**ARU**", "**we**", "**us**", or "**our**"). This Policy applies to all individuals who access, register, browse, or transact across:
 * **The Runway**: Our visual social discovery ecosystem featuring fashion lookbooks, design showcases, video reels, interactive comments, and creator engagements.
 * **The Market**: Our multi-vendor fashion e-commerce marketplace connecting independent fashion brands with global shoppers.
 * **The Custom Tailoring Engine**: Our bespoke garment commissioning architecture utilizing 38-point ISO 8559 measurement schemas and interactive SVG body silhouette visualizers.
@@ -19,14 +19,14 @@ This Master Privacy Policy and Data Governance Directive ("**Privacy Policy**" o
 
 ### 1.2. Data Controller Identity
 For all users accessing the Services globally, the designated legal data controller is:
-* **Corporate Entity**: WIEZ Platforms Limited
-* **Data Protection Office**: `privacy@wiez.com`
-* **Legal Department**: `legal@wiez.com`
-* **Registered Address**: 12B Admiralty Way, Lekki Phase 1, Lagos, Federal Republic of Nigeria
+* **Corporate Entity**: Soteria Genesis Limited
+* **Data Protection Office**: `privacy@{{LEGAL_EMAIL_DOMAIN}}`
+* **Legal Department**: `legal@{{LEGAL_EMAIL_DOMAIN}}`
+* **Registered Address**: No. 12, Adefarati, Church Street, Power Line, Lekki, Lagos, Federal Republic of Nigeria
 
 
 ### 1.3. Fundamental Privacy Principles
-WIEZ adheres to strict global data governance principles:
+ARU adheres to strict global data governance principles:
 1. **Lawfulness, Fairness, and Transparency**: We process personal data solely on legitimate statutory grounds with complete operational transparency.
 2. **Purpose Limitation**: Data collected for a specific purpose (such as custom tailoring measurements or brand KYC verification) is never repurposed for unrelated marketing without explicit consent.
 3. **Data Minimization & Isolation**: We collect only the data necessary to provide our services. Highly sensitive records (such as body measurements and merchant KYC documents) are stored in cryptographically isolated data stores.
@@ -53,7 +53,7 @@ We collect information directly from you, automatically through your platform us
 
 ## 3. Deep Telemetry and Information Collected Automatically
 
-When you interact with WIEZ, our telemetry infrastructure automatically records operational, engagement, and device signals:
+When you interact with ARU, our telemetry infrastructure automatically records operational, engagement, and device signals:
 
 ### 3.1. Runway & Feed Interaction Telemetry
 * **Visual Dwell Time**: We record the duration of time you spend viewing specific fashion designs, video lookbooks, or designer profiles to compute recommendation relevance.
@@ -70,6 +70,25 @@ When you interact with WIEZ, our telemetry infrastructure automatically records 
 * **Network & Connection Telemetry**: IP address, internet service provider (ISP), mobile network carrier, connection type (Wi-Fi, 4G, 5G), network latency, and timezone offset.
 * **Display & Localization Specs**: Screen resolution, pixel density (DPI), color gamut, preferred system language, and locale settings.
 * **Push Notification Infrastructure**: Unique cryptographic push notification tokens (Apple Push Notification Service / Firebase Cloud Messaging) to deliver transactional alerts.
+
+### 3.4. Personalised Market and regional picks
+
+**What we do.** When personalisation is switched on, the Market can show sections chosen for you, such as "Picked for you", "Still thinking about these", "From brands you follow" and "Popular in your state". Each personalised section is labelled, and **Why am I seeing this?** shows the kind of signal behind it (for example "you viewed similar items" or "you follow this brand"). It never shows another person's activity.
+
+**What we use.** Only what you do on ARU: items and sections you view, save, add to bag or buy; brands you follow; searches you run on ARU; items you hide or mark "Not interested"; and, if you choose, your fit profile and the state you declared in your profile. We do not use data from other websites or apps, we do not buy data, and we do not use your device location.
+
+**Your taste profile.** From those signals we compute a short list of the categories, styles, colours, price ranges and brands you seem to prefer (your "taste profile"). It is used only to order items on ARU. It is never sold, never shared with Brands or advertisers, and never used to set prices, credit, eligibility or any decision with a legal or similarly significant effect on you.
+
+**Regional picks ("Popular in your state").** This is off unless you turn it on in Market preferences. It uses only the state you declared in your profile, not your device location or IP address. A state's picks are built from the combined activity of at least **20 different shoppers** in that state, so they cannot describe any one person. Turning it off stops it at once.
+
+**Who is excluded.** Personalisation starts only after you confirm, once, that you are 18 or over. If you do not confirm, or you are under 18, the Market is not personalised for you (see §16). Brand owners' and staff activity on their own items is not counted.
+
+**Your controls.**
+* **Don't personalise my Market** (web: Settings > Market & Feed; app: Settings > Market preferences): stops personalised sections and deletes your taste profile. The Market then shows the same sections every shopper sees.
+* **Reset market preferences:** deletes your taste profile and starts it again from new activity only.
+* **Not interested / Hide** on any item or brand.
+* **Popular in your state:** on or off at any time.
+* Turning optional analytics off (Cookie Policy §9) also stops discovery signals being sent from that device.
 
 ---
 
@@ -91,7 +110,7 @@ In the event of a sizing dispute during the 72-hour inspection window, our dispu
 
 ## 5. Brand Studio Verification (KYC) and Anti-Money Laundering Safeguards
 
-To prevent fraud, counterfeit goods, and money laundering, fashion brands operating on WIEZ must undergo rigorous merchant verification:
+To prevent fraud, counterfeit goods, and money laundering, fashion brands operating on ARU must undergo rigorous merchant verification:
 
 ### 5.1. KYC Records Collected
 Brand owners submit: (a) Corporate Affairs Commission (CAC) incorporation certificates or international business registrations, (b) Tax Identification Numbers (TIN), (c) valid government-issued identity documents (National ID, International Passport, or Driver’s License), (d) proof of physical studio address, and (e) verified corporate bank account details.
@@ -103,16 +122,16 @@ All Brand KYC documents are uploaded via cryptographically signed temporary URLs
 To protect Brand owners from identity theft, our public backend APIs (`GET /brands/:id`, `GET /brands/username/:handle`) strictly redact all corporate registration numbers, TINs, owner personal emails, and banking coordinates for all public visitor requests.
 
 ### 5.4. Physical Verification Evidence
-To complete verification, a WIEZ agent checks the Brand's workspace in person or, for Brands on the free plan who choose it, on a live video call. The agent records photographs or screenshots of the workspace, tools and work in progress, which may incidentally show people present. WIEZ uses this evidence only to decide and defend the verification decision, stores it with the Brand's verification records under the same access controls as other KYC records, and keeps it for as long as those records are kept. Video calls take place on a third-party meeting service whose link the agent provides; WIEZ does not record the call's audio or video — only the screenshots the agent saves as evidence.
+To complete verification, a ARU agent checks the Brand's workspace in person or, for Brands on the free plan who choose it, on a live video call. The agent records photographs or screenshots of the workspace, tools and work in progress, which may incidentally show people present. ARU uses this evidence only to decide and defend the verification decision, stores it with the Brand's verification records under the same access controls as other KYC records, and keeps it for as long as those records are kept. Video calls take place on a third-party meeting service whose link the agent provides; ARU does not record the call's audio or video — only the screenshots the agent saves as evidence.
 
 ---
 
 ## 6. Financial Data, Payment Processing, and Escrow Mechanics
 
 ### 6.1. PCI-DSS Tokenized Payment Intake
-* WIEZ integrates with PCI-DSS Level 1 certified payment processors (including Paystack and the authorized card networks it settles through).
-* **Zero Raw Card Storage**: WIEZ never receives, processes, or stores your full 16-digit primary account number (PAN), CVV, or card PIN.
-* **Tokenized References**: Our payment gateways provide WIEZ with cryptographic authorization tokens, card brands (e.g., Visa, Mastercard), expiration years, and masked last-4 digits to display saved cards in your checkout drawer.
+* ARU integrates with PCI-DSS Level 1 certified payment processors (including Paystack and the authorized card networks it settles through).
+* **Zero Raw Card Storage**: ARU never receives, processes, or stores your full 16-digit primary account number (PAN), CVV, or card PIN.
+* **Tokenized References**: Our payment gateways provide ARU with cryptographic authorization tokens, card brands (e.g., Visa, Mastercard), expiration years, and masked last-4 digits to display saved cards in your checkout drawer.
 
 ### 6.2. Escrow Settlement Ledger Architecture
 * Payments collected upon checkout are deposited into a segregated settlement ledger (`CustomOrderFinanceSyncService`).
@@ -128,26 +147,28 @@ We process your personal information only when authorized by law:
 | Purpose of Processing | Applicable Data | Legal Basis |
 | --- | --- | --- |
 | 1. Processing Market Bag Orders and Custom Tailoring Contracts | Identity, Address, Measurements, Tokens | **Performance of a Contract** (Fulfilling the purchase agreement) |
-| 2. Runway Feed Personalization and Visual Recommendation Ranking | Dwell Time, Likes, Saves, Search Logs | **Legitimate Interests** (Improving user experience) |
+| 2. Runway and Market personalisation (labelled personalised sections and the taste profile, §3.4) | Views, saves, bag and order items, follows, ARU searches, hide / not-interested choices | **Legitimate Interests** (relevant discovery), with an unconditional right to object (Don't personalise my Market) |
 | 3. Brand Verification & AML Screening | CAC, TIN, Gov IDs, Bank Details | **Compliance with Legal Obligation** (Tax, corporate, and AML compliance) |
 | 4. Tailoring Fit Dispute Forensics | Measurement Profiles, Inspection Photos | **Performance of a Contract** & **Legitimate Interests** (Fairness) |
 | 5. Direct Shopper-Brand Chat | Chat Text, Images, Fitting Notes | **Performance of a Contract** (Order coordination) |
 | 6. Push & Transactional Alerting | Push Tokens, Email, Phone Number | **Performance of a Contract** & **Consent** (Marketing preferences) |
 | 7. Optional Analytics (Web and App) | Page addresses with identifiers removed, browser or device type, a random browser or install ID, discovery signals sent from your device, performance timings | **Consent** (your analytics choice; withdraw at any time) |
+| 8. Fit-based suggestions (only if you turn it on) | Fit profile | **Consent** (withdraw at any time) |
+| 9. Regional picks ("Popular in your state") | Declared state, combined with at least 20 other shoppers | **Consent** (opt-in; withdraw at any time) |
 
 ### 7.1. Legitimate Interests Balancing Assessment
-Where WIEZ relies on **Legitimate Interests** as the legal basis for processing (particularly for Runway feed personalization, dwell time telemetry, and marketplace signal analytics), we have conducted and documented a balancing assessment confirming that:
+Where ARU relies on **Legitimate Interests** as the legal basis for processing (particularly for Runway feed personalization, dwell time telemetry, and marketplace signal analytics), we have conducted and documented a balancing assessment confirming that:
 * Our legitimate interest in improving discovery feed relevance is genuine and specific.
-* The processing involves only pseudonymized or anonymized first-party engagement signals; it does not create behavioral profiles linked to external activities.
+* The processing uses only first-party signals from your activity on ARU. It creates a taste profile limited to your preferences on ARU (§3.4); it never combines your data with activity outside ARU and is never used for decisions with legal or similarly significant effects.
 * The processing creates a direct, proportionate benefit to users through more relevant fashion discovery.
-* Users retain an unconditional right to object to this processing at any time via `privacy@wiez.com` or by resetting their market preferences (web: Settings > Market & Feed; app: Settings > Market preferences), after which feed personalization processing for that user will cease.
+* Users retain an unconditional right to object at any time, by choosing **Don't personalise my Market** (web: Settings > Market & Feed; app: Settings > Market preferences) or by writing to `privacy@{{LEGAL_EMAIL_DOMAIN}}`. Personalisation then stops at once and your taste profile is deleted.
 * On the web and in the app, discovery signals are stored and sent from your device only with your consent (row 7 above and our Cookie Policy).
 
 ---
 
 ## 8. Third-Party Sub-Processors and Service Integrations
 
-WIEZ engages trusted third-party technical providers to operate infrastructure services under binding Data Processing Agreements (DPAs):
+ARU engages trusted third-party technical providers to operate infrastructure services under binding Data Processing Agreements (DPAs):
 
 ### 8.1. Infrastructure & Hosting Sub-Processors
 * **Amazon Web Services (AWS)**: Cloud compute and the managed PostgreSQL database.
@@ -176,7 +197,7 @@ We do not send SMS messages and we use no SMS provider. Phone numbers are stored
 
 ## 9. Cryptography, Storage, and Security Architecture
 
-WIEZ deploys multi-layered technical and organizational security controls:
+ARU deploys multi-layered technical and organizational security controls:
 
 | Layer | Technical Implementation & Standard |
 | --- | --- |
@@ -191,37 +212,37 @@ WIEZ deploys multi-layered technical and organizational security controls:
 
 ## 10. Law Enforcement Requests and Government Disclosures
 
-WIEZ is committed to protecting user privacy against unlawful or overbroad government surveillance. We disclose user records to government or law enforcement agencies only under the following strict conditions:
+ARU is committed to protecting user privacy against unlawful or overbroad government surveillance. We disclose user records to government or law enforcement agencies only under the following strict conditions:
 
 1. **Mandatory Legal Process**: We require a valid, binding court order, search warrant, or statutory subpoena issued by a court of competent jurisdiction (e.g., Nigerian Federal High Court or recognized international tribunal).
 2. **Scrutiny of Requests**: Our legal department reviews every request for statutory validity and pushes back against overbroad, generic, or unauthorized requests.
-3. **User Notification**: Unless strictly prohibited by a non-disclosure order or where disclosure would create an immediate risk of death or serious bodily harm, WIEZ will attempt to notify the affected user prior to disclosing records.
+3. **User Notification**: Unless strictly prohibited by a non-disclosure order or where disclosure would create an immediate risk of death or serious bodily harm, ARU will attempt to notify the affected user prior to disclosing records.
 
 ---
 
 ## 10A. Data Security Breach Notification and Incident Response
 
-WIEZ maintains an active incident response program and is committed to transparent, timely notification in the event of a personal data security breach.
+ARU maintains an active incident response program and is committed to transparent, timely notification in the event of a personal data security breach.
 
 ### 10A.1. Our Incident Response Obligations
 In the event of a personal data breach that poses a risk to the rights and freedoms of individuals:
-* **Supervisory Authority Notification**: WIEZ will notify the **Nigeria Data Protection Commission (NDPC)** within **72 hours** of becoming aware of the breach, in accordance with the Nigeria Data Protection Act 2023 Section 40. For EEA users, the relevant EU Data Protection Authority will be notified within 72 hours per GDPR Article 33.
-* **Affected User Notification**: Where a breach is likely to result in high risk to the rights and freedoms of individuals (e.g., exposure of body measurements, financial data, or KYC documents), WIEZ will notify affected users **directly and without undue delay** via email and in-app notification per GDPR Article 34 and NDPA 2023 Section 40(3).
+* **Supervisory Authority Notification**: ARU will notify the **Nigeria Data Protection Commission (NDPC)** within **72 hours** of becoming aware of the breach, in accordance with the Nigeria Data Protection Act 2023 Section 40. For EEA users, the relevant EU Data Protection Authority will be notified within 72 hours per GDPR Article 33.
+* **Affected User Notification**: Where a breach is likely to result in high risk to the rights and freedoms of individuals (e.g., exposure of body measurements, financial data, or KYC documents), ARU will notify affected users **directly and without undue delay** via email and in-app notification per GDPR Article 34 and NDPA 2023 Section 40(3).
 
 ### 10A.2. Content of Breach Notification to Users
-Where user notification is required, WIEZ will communicate:
+Where user notification is required, ARU will communicate:
 1. A description of the nature of the breach in plain language.
 2. The categories and approximate number of users and data records affected.
 3. The name and contact details of the Data Protection Officer.
 4. The likely consequences of the breach.
-5. The measures WIEZ has taken or proposes to take to address the breach and mitigate its effects.
+5. The measures ARU has taken or proposes to take to address the breach and mitigate its effects.
 6. Recommended steps that affected users may take to protect themselves.
 
 ### 10A.3. Breach Reporting Threshold
-Not every security incident constitutes a notifiable breach. WIEZ conducts a documented risk assessment for each incident. Internal security events that pose no risk to user rights (e.g., failed login attempts blocked by rate limiting, test environment anomalies) do not trigger notification obligations.
+Not every security incident constitutes a notifiable breach. ARU conducts a documented risk assessment for each incident. Internal security events that pose no risk to user rights (e.g., failed login attempts blocked by rate limiting, test environment anomalies) do not trigger notification obligations.
 
 ### 10A.4. Security Vulnerability Disclosure
-Security researchers who discover potential vulnerabilities in WIEZ's infrastructure, API, or mobile application are invited to report responsibly to `security@wiez.com`. WIEZ operates a good-faith responsible disclosure program and will not pursue legal action against researchers who report vulnerabilities responsibly and without exploiting them.
+Security researchers who discover potential vulnerabilities in ARU's infrastructure, API, or mobile application are invited to report responsibly to `security@{{LEGAL_EMAIL_DOMAIN}}`. ARU operates a good-faith responsible disclosure program and will not pursue legal action against researchers who report vulnerabilities responsibly and without exploiting them.
 
 ---
 
@@ -234,7 +255,10 @@ Security researchers who discover potential vulnerabilities in WIEZ's infrastruc
 | **Active User Profiles** | Duration of account activity | Contract performance |
 | **In-App Buyer-Designer Messages** | **12 months** after order completion | Dispute resolution support and fraud prevention |
 | **Custom Measurement Snapshots** | **12 months** after order fulfillment | Alteration audits and repeat commissions |
-| **Market Signal Telemetry** | **24 hours** in local queue; analytics aggregates retained indefinitely in anonymized form | Feed personalization (legitimate interest) |
+| **Market activity events** (views, saves, section and suggestion interactions, linked to your account or a random device ID) | **30 days**, then deleted | Personalisation and fraud-resistant counting (legitimate interest) |
+| **Taste profile** (§3.4) | Recomputed only from the last 30 days of activity; deleted after **90 days** without new activity, and at once on reset, on "Don't personalise", or on account deletion | Personalisation (legitimate interest) |
+| **Recent searches kept on our servers** | Last searches, kept for **30 days** | Showing your recent searches across devices |
+| **Combined statistics** (counts per item, per category, per state with at least 20 shoppers) | Kept in anonymised form; contain no account or device identifier | Trends, popularity and service quality |
 | **Authentication Logs & Security Events** | **90 days** rolling | Security breach investigation |
 | **Commercial & Tax Records** | **7 years** | CAMA 2020, FIRS regulations, anti-fraud audits |
 | **KYC / Brand Verification Documents** | **7 years** after Brand account closure | SCUML AML compliance requirements |
@@ -245,36 +269,37 @@ Security researchers who discover potential vulnerabilities in WIEZ's infrastruc
 When you request account deletion via Settings (`/settings/delete-account`):
 1. **Public Eradication**: Your public profile, Runway posts, video lookbooks, comments, likes, and bookmarks are immediately removed from public display.
 2. **Session Revocation**: All active JWT refresh tokens and password credentials are invalidated.
-3. **Identifier Pseudonymization**: Your active email is converted into an anonymous hash (`deleted+timestamp-id@wiez.local`) and your @username is randomized (`deleted_timestamp`).
-4. **Commerce & Ledger Preservation**: Past order ledgers, escrow settlement records, and dispute archives remain preserved in an archived, pseudonymized state to satisfy tax, audit, and legal defense requirements.
+3. **Identifier Pseudonymization**: Your active email is converted into an anonymous, non-routable placeholder address and your @username is randomized (`deleted_timestamp`).
+4. **Discovery Data**: Your taste profile and regional opt-in are deleted. Market activity events are deleted by our retention process, and server-side recent searches expire within 30 days. Discovery details kept with past orders (such as the section an item was bought from) remain only as part of the commercial record and are never used for personalisation again.
+5. **Commerce & Ledger Preservation**: Past order ledgers, escrow settlement records, and dispute archives remain preserved in an archived, pseudonymized state to satisfy tax, audit, and legal defense requirements.
 
 ---
 
 ## 12. Your Global Data Privacy Rights and In-App Controls
 
-You possess the following statutory rights under applicable global data protection frameworks (GDPR Article 12–22, NDPA 2023 Part VI, CCPA/CPRA). Rights requests may be submitted to `privacy@wiez.com`:
+You possess the following statutory rights under applicable global data protection frameworks (GDPR Article 12–22, NDPA 2023 Part VI, CCPA/CPRA). Rights requests may be submitted to `privacy@{{LEGAL_EMAIL_DOMAIN}}`:
 
 | Your right | What it covers and how to use it |
 | --- | --- |
 | 1. Right to Access & Portability [GDPR Art. 15 / Art. 20] | Obtain a complete, structured, machine-readable copy (JSON/CSV) of your personal data and measurement history. |
 | 2. Right to Rectification [GDPR Art. 16] | Correct inaccurate body measurements, addresses, or profile details directly via your Settings dashboard. |
 | 3. Right to Erasure ("Right to Be Forgotten") [GDPR Art. 17] | Initiate account deactivation and identifier pseudonymization via Settings > Delete Account. Note: Retention of tax/audit records as per §11.1 applies. |
-| 4. Right to Restriction of Processing [GDPR Art. 18] | Request that WIEZ pauses processing of your personal data (e.g., while accuracy or objection is being contested). Submit request to privacy@wiez.com. |
-| 5. Right to Object [GDPR Art. 21] | Object to processing based on Legitimate Interests (e.g., Runway feed personalization). Where your interests override WIEZ's, processing will be halted for that specific purpose. |
+| 4. Right to Restriction of Processing [GDPR Art. 18] | Request that ARU pauses processing of your personal data (e.g., while accuracy or objection is being contested). Submit request to privacy@{{LEGAL_EMAIL_DOMAIN}}. |
+| 5. Right to Object [GDPR Art. 21] | Object to processing based on Legitimate Interests (e.g., Runway feed personalization). Where your interests override ARU's, processing will be halted for that specific purpose. |
 | 6. Right to Withdraw Consent [GDPR Art. 7(3)] | Where processing is based on your consent (e.g., marketing emails, optional analytics), you may withdraw consent at any time without penalty: marketing messages via Settings > Notifications; optional analytics on the web via Settings > Privacy > Change cookie settings, and in the app via Settings > Privacy controls > Usage analytics. |
 | 7. Profile & Location Visibility Controls | Switch between Public Profile (UNLOCKED) and Private Profile (LOCKED), and independently toggle "Show my username" and "Show my location" in Settings > Privacy. |
-| 8. Cookie & Signal Queue Reset | Reset your market preferences at any time (web: Settings > Market & Feed; app: Settings > Market preferences). Turning analytics off also deletes the random browser or install ID and queued signals. |
+| 8. Personalisation controls and profiling | See and control personalisation: **Don't personalise my Market**, **Reset market preferences**, **Popular in your state** on or off, and **Why am I seeing this?** on each personalised section (web: Settings > Market & Feed; app: Settings > Market preferences). You may also ask `privacy@{{LEGAL_EMAIL_DOMAIN}}` for the categories in your taste profile. Personalisation never makes decisions with legal or similarly significant effects about you (NDPA 2023 s. 37; GDPR Art. 22). Turning analytics off also deletes the random browser or install ID and queued signals. |
 
-**Response Timeline**: WIEZ will acknowledge all privacy rights requests within **72 hours** and fulfill them within **30 days** (extendable by a further 60 days for complex requests, with written notice).
+**Response Timeline**: ARU will acknowledge all privacy rights requests within **72 hours** and fulfill them within **30 days** (extendable by a further 60 days for complex requests, with written notice).
 
-**Limitations**: Rights to erasure, restriction, and objection are limited where WIEZ is required to retain data by law (tax, AML, court orders) or where processing is necessary for legal defense.
+**Limitations**: Rights to erasure, restriction, and objection are limited where ARU is required to retain data by law (tax, AML, court orders) or where processing is necessary for legal defense.
 
 ---
 
 ## 13. Statutory Annex: Nigeria Data Protection Act (NDPA 2023)
 
 For users residing in the Federal Republic of Nigeria:
-* **Compliance**: WIEZ processes personal data in strict accordance with the **Nigeria Data Protection Act (NDPA 2023)** and the Nigeria Data Protection Regulation (NDPR).
+* **Compliance**: ARU processes personal data in strict accordance with the **Nigeria Data Protection Act (NDPA 2023)** and the Nigeria Data Protection Regulation (NDPR).
 * **Sensitive Data Processing**: Body physical measurements are processed under Article 30 of the NDPA based on your explicit contractual consent for bespoke garment fabrication.
 * **Supervisory Authority**: You have the statutory right to lodge a formal complaint with the **Nigeria Data Protection Commission (NDPC)** at `ndpc.gov.ng`.
 
@@ -287,10 +312,10 @@ For users residing in the European Economic Area (EEA) or United Kingdom:
 * **Supervisory Complaint**: You have the right to lodge a complaint with your local EU Data Protection Authority or the UK Information Commissioner’s Office (ICO).
 
 ### 14A. International Data Transfer Safeguards (SCCs & UK IDTA)
-Because WIEZ operates a global fashion ecosystem with cloud infrastructure across multiple jurisdictions:
-* **Module 2 Controller-to-Processor SCCs**: Where personal data originating in the EEA is transferred to infrastructure or processors outside the EEA (such as Nigeria or the United States), WIEZ executes **Standard Contractual Clauses (SCCs)** pursuant to European Commission Implementing Decision (EU) 2021/914 (Module 2: Controller-to-Processor).
-* **UK International Data Transfer Addendum**: For transfers originating in the United Kingdom, WIEZ incorporates the UK ICO International Data Transfer Addendum to the EU Commission SCCs (Version B1.0).
-* **Technical Safeguards**: All cross-border data transfers are encrypted in transit using TLS 1.3 and encrypted at rest with AES-256 GCM. Primary European database replicas are hosted in secure AWS European regions (EU-West-1 Ireland), and uploaded media is stored and cached on Cloudflare's network. Users may request an unredacted copy of our standard SCC terms by emailing `privacy@wiez.com`.
+Because ARU operates a global fashion ecosystem with cloud infrastructure across multiple jurisdictions:
+* **Module 2 Controller-to-Processor SCCs**: Where personal data originating in the EEA is transferred to infrastructure or processors outside the EEA (such as Nigeria or the United States), ARU executes **Standard Contractual Clauses (SCCs)** pursuant to European Commission Implementing Decision (EU) 2021/914 (Module 2: Controller-to-Processor).
+* **UK International Data Transfer Addendum**: For transfers originating in the United Kingdom, ARU incorporates the UK ICO International Data Transfer Addendum to the EU Commission SCCs (Version B1.0).
+* **Technical Safeguards**: All cross-border data transfers are encrypted in transit using TLS 1.3 and encrypted at rest with AES-256 GCM. Primary European database replicas are hosted in secure AWS European regions (EU-West-1 Ireland), and uploaded media is stored and cached on Cloudflare's network. Users may request an unredacted copy of our standard SCC terms by emailing `privacy@{{LEGAL_EMAIL_DOMAIN}}`.
 
 ---
 
@@ -298,7 +323,7 @@ Because WIEZ operates a global fashion ecosystem with cloud infrastructure acros
 
 For residents of California and US states with comprehensive privacy legislation:
 * **Notice at Collection**: We collect the categories of personal information listed in Article 2 of this Policy for the business purposes described in Article 3.
-* **Zero Sale / Share of Personal Information**: WIEZ does not "sell" your personal data or bodily measurements for monetary compensation, nor do we "share" personal data for cross-context behavioral advertising.
+* **Zero Sale / Share of Personal Information**: ARU does not "sell" your personal data or bodily measurements for monetary compensation, nor do we "share" personal data for cross-context behavioral advertising.
 * **Right to Limit Use of Sensitive Personal Information**: We use sensitive physical body measurements solely to perform the services requested (bespoke garment tailoring).
 * **Non-Discrimination**: We will not discriminate against you (through pricing or service quality) for exercising any CCPA privacy rights.
 
@@ -306,13 +331,13 @@ For residents of California and US states with comprehensive privacy legislation
 
 ## 16. Protection of Children and Minors (COPPA, UK AADC, and NDPA 2023)
 
-WIEZ takes special precautions to protect the privacy and safety of children and underage users:
-* **Strict Under-13 Prohibition**: WIEZ is strictly not directed to children under **13 years of age**. We do not knowingly collect personal data, body measurements, or payment details from children under 13.
+ARU takes special precautions to protect the privacy and safety of children and underage users:
+* **Strict Under-13 Prohibition**: ARU is strictly not directed to children under **13 years of age**. We do not knowingly collect personal data, body measurements, or payment details from children under 13.
 * **Minors Aged 13 to 17 (Age-Appropriate Safeguards)**:
-  - **No Behavioral Profiling**: WIEZ does not subject accounts registered by minors (aged 13–17) to behavioral discovery profiling or predictive commercial targeting.
+  - **No Behavioral Profiling**: Market personalisation runs only for shoppers who have confirmed they are 18 or over (§3.4). Accounts of minors (aged 13–17) are never subjected to behavioral discovery profiling or predictive commercial targeting.
   - **Private-by-Default Controls**: Accounts identified as minors have location sharing and public contact details disabled by default.
   - **No Commercial Data Exploitation**: Body measurements collected for tailoring items for minors are strictly restricted to the commissioned designer and are never surfaced on public feeds.
-* **Parental Verification and Access**: Parents or legal guardians may review, edit, or request the immediate deletion of their child's personal data by contacting `privacy@wiez.com`.
+* **Parental Verification and Access**: Parents or legal guardians may review, edit, or request the immediate deletion of their child's personal data by contacting `privacy@{{LEGAL_EMAIL_DOMAIN}}`.
 * **Immediate Removal**: If we learn that an account has been registered by a child under 13 without verifiable parental consent, we will immediately terminate the account and permanently pseudonymize all associated records.
 
 ---
@@ -322,7 +347,7 @@ WIEZ takes special precautions to protect the privacy and safety of children and
 We reserve the right to update this Privacy Policy periodically. When material changes are made:
 * We will provide at least **fifteen (15) days' advance notice** via an in-app banner or email alert.
 * We update the "Effective Date" and version number at the top of this document.
-* Your continued use of WIEZ after the effective date constitutes acknowledgment of the updated Policy.
+* Your continued use of ARU after the effective date constitutes acknowledgment of the updated Policy.
 
 ---
 
@@ -330,12 +355,12 @@ We reserve the right to update this Privacy Policy periodically. When material c
 
 If you have questions, data portability requests, or privacy compliance inquiries, please contact our specialized teams:
 
-* **Data Protection Officer (DPO)**: `privacy@wiez.com`
-* **Legal & Regulatory Affairs**: `legal@wiez.com`
-* **Security & Vulnerability Reports**: `security@wiez.com`
+* **Data Protection Officer (DPO)**: `privacy@{{LEGAL_EMAIL_DOMAIN}}`
+* **Legal & Regulatory Affairs**: `legal@{{LEGAL_EMAIL_DOMAIN}}`
+* **Security & Vulnerability Reports**: `security@{{LEGAL_EMAIL_DOMAIN}}`
 * **Mailing Address**:  
-  Data Protection Office, WIEZ Platforms Limited  
-  12B Admiralty Way, Lekki Phase 1,  
+  Data Protection Office, Soteria Genesis Limited  
+  No. 12, Adefarati, Church Street, Power Line, Lekki,  
   Lagos, Nigeria.
 
 ---
@@ -348,14 +373,14 @@ The subscription queue rules in this document apply to new custom-order queue pu
 
 ## Custom-order queue and subscription records
 
-To perform queue purchases, billing, cancellation and support, WIEZ processes placement/activation/expiry/retain timestamps, lane and priority, admin promotion-hold reasons, tier and price snapshots, billing periods and authorization references, payment/refund component amounts and statuses, notification delivery records, and access/audit events. The purposes are contract performance, payment reconciliation, fraud prevention and resolving disputes; existing lawful bases, minimization, access controls, retention and legal-hold rules apply. Queue previews expose aggregate counts rather than other shoppers' identities or measurements. Notifications limit private information; marketing consent does not replace necessary transaction notices. Measurements remain limited to the relevant order and authorized participants. Cancellation, suspension, listing removal or subscription termination does not erase evidence needed to finish refunds or satisfy retention obligations. Subscription cancellation is distinct from account/data deletion. You may exercise the rights and contact routes in this Policy.
+To perform queue purchases, billing, cancellation and support, ARU processes placement/activation/expiry/retain timestamps, lane and priority, admin promotion-hold reasons, tier and price snapshots, billing periods and authorization references, payment/refund component amounts and statuses, notification delivery records, and access/audit events. The purposes are contract performance, payment reconciliation, fraud prevention and resolving disputes; existing lawful bases, minimization, access controls, retention and legal-hold rules apply. Queue previews expose aggregate counts rather than other shoppers' identities or measurements. Notifications limit private information; marketing consent does not replace necessary transaction notices. Measurements remain limited to the relevant order and authorized participants. Cancellation, suspension, listing removal or subscription termination does not erase evidence needed to finish refunds or satisfy retention obligations. Subscription cancellation is distinct from account/data deletion. You may exercise the rights and contact routes in this Policy.
 
 ### Original-payment conversion for custom-order refunds
 
-When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. WIEZ records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
+When the original custom-order payment was converted into a different provider currency, its refund uses the original payment's recorded exchange-rate snapshot. ARU records the refund conversion, currency and provider amount for reconciliation; later exchange-rate changes do not reprice the refund. Shared-payment refunds use cumulative minor-unit rounding so their total cannot exceed the captured amount. If the original conversion cannot be verified, cancellation remains recorded and the refund requires reconciliation before provider submission. The refund quote identifies any estimated converted amount; provider processing and bank credit remain separate.
 
 An agreed post-Active partial dispute refund returns only the agreed amount. The order continues in its existing production/delivery lane. Each refund is recorded separately, repeat requests cannot duplicate it, and any later full remedy refunds only the remaining refundable balance. Future milestone earnings are reduced for the refunded share; no held milestone becomes payable because of a partial refund.
 
 ### Subscription and saved-payment privacy
 
-Subscription tier, billing history, subscription history and saved-payment settings are private to the brand owner and authorized operational administrators. They are not published on public brand pages or disclosed through shopper queue responses. WIEZ stores provider-issued payment authorizations encrypted, masked card details, the original payment identity needed for verification, and billing records. New-card entry for subscription settings occurs in the provider’s secure payment flow. These settings do not store card numbers, CVVs or PINs. A server-side notice receipt records when a brand owner was shown or dismissed an upgrade notice, applying one shared 24-hour limit across login, Studio, web and native. Igwe brands receive no automatic upgrade notice.
+Subscription tier, billing history, subscription history and saved-payment settings are private to the brand owner and authorized operational administrators. They are not published on public brand pages or disclosed through shopper queue responses. ARU stores provider-issued payment authorizations encrypted, masked card details, the original payment identity needed for verification, and billing records. New-card entry for subscription settings occurs in the provider’s secure payment flow. These settings do not store card numbers, CVVs or PINs. A server-side notice receipt records when a brand owner was shown or dismissed an upgrade notice, applying one shared 24-hour limit across login, Studio, web and native. Igwe brands receive no automatic upgrade notice.
